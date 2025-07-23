@@ -265,16 +265,27 @@ function App() {
             </h2>
                 </div>
                 <div className="p-6">
+                <div className="grid grid-cols-4 gap-4 font-semibold pb-2 border-b">
+                <div>Description</div>
+                <div>Date</div>
+                <div className="text-left">Amount</div>
+                <div className="text-left">Balance</div>
+                </div>
                 {transactionData.transactions.map((tx: any, index: number) => (
-                    <div key={index} className="flex justify-between py-2 border-b">
-                        <div>
+                    <div
+                    key={index}
+                    className="grid grid-cols-4 gap-4 items-center py-2 border-b"
+                        >
                         <div className="font-medium">{tx.description}</div>
                         <div className="text-sm text-gray-500">{tx.date}</div>
-                        </div>
-                        <div className={`font-mono ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div
+                    className={`font-mono text-left ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}
+                        >
                         {tx.formattedAmount}
                     </div>
-                        <div className={`font-mono ${tx.runningBalance > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div
+                    className={`font-mono text-left ${tx.runningBalance > 0 ? 'text-green-600' : 'text-red-600'}`}
+                        >
                         {tx.formattedRunningBalance}
                     </div>
                         </div>
