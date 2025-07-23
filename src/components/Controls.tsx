@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { RefreshCw, Search, FileText, Activity } from 'lucide-react';
+import { RefreshCw, Search, FileText, Activity, Calendar } from 'lucide-react';
 
 interface ControlsProps {
   onRefresh: () => void;
   onFileChange: (file: string) => void;
   onCommandChange: (command: string) => void;
   onAccountSearch: (account: string) => void;
+  onPeriodChange: (period: string) => void;
   isLoading: boolean;
   currentFile: string;
   currentCommand: string;
+  currentPeriod: string;
 }
 
 export const Controls: React.FC<ControlsProps> = ({
   onRefresh,
   onFileChange,
   onCommandChange,
+  onPeriodChange,
   onAccountSearch,
   isLoading,
   currentFile,
-  currentCommand
+  currentCommand,
+  currentPeriod
 }) => {
   const [searchAccount, setSearchAccount] = useState('');
 
@@ -36,7 +40,8 @@ export const Controls: React.FC<ControlsProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Row - Main Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
         {/* File Input */}
         <div className="space-y-2">
           <label className="flex items-center text-sm font-medium text-gray-700">
@@ -72,6 +77,21 @@ export const Controls: React.FC<ControlsProps> = ({
           </select>
         </div>
 
+        {/* Period Filter */}
+        <div className="space-y-2">
+          <label className="flex items-center text-sm font-medium text-gray-700">
+            <Calendar className="h-4 w-4 mr-1" />
+            Period Filter
+          </label>
+          <input
+            type="text"
+            value={currentPeriod}
+            onChange={(e) => onPeriodChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="2025/07 or 2025"
+          />
+        </div>
+
         {/* Account Search */}
         <div className="space-y-2">
           <label className="flex items-center text-sm font-medium text-gray-700">
@@ -97,7 +117,7 @@ export const Controls: React.FC<ControlsProps> = ({
           </div>
         </div>
 
-        {/* Refresh Button */}
+        {/* Actions */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 block">
             Actions
@@ -113,9 +133,51 @@ export const Controls: React.FC<ControlsProps> = ({
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
+      {/* Period Quick Buttons */}
+      <div className="mb-4 pb-4 border-b border-gray-200">
         <div className="flex flex-wrap gap-2">
+          <span className="text-sm font-medium text-gray-700 mr-2">Quick Period:</span>
+          <button
+            onClick={() => onPeriodChange(new Date().getFullYear().toString())}
+            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+          >
+            This Year
+          </button>
+          <button
+            onClick={() => {
+              const now = new Date();
+              const month = String(now.getMonth() + 1).padStart(2, '0');
+              onPeriodChange(`${now.getFullYear()}/${month}`);
+            }}
+            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+          >
+            This Month
+          </button>
+          <button
+            onClick={() => {
+              const now = new Date();
+              const lastMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+              const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+              const month = String(lastMonth).padStart(2, '0');
+              onPeriodChange(`${year}/${month}`);
+            }}
+            className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+          >
+            Last Month
+          </button>
+          <button
+            onClick={() => onPeriodChange('')}
+            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Account Filters */}
+      <div>
+        <div className="flex flex-wrap gap-2">
+          <span className="text-sm font-medium text-gray-700 mr-2">Quick Filters:</span>
           <button
             onClick={() => onCommandChange('bal Ativos')}
             className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"

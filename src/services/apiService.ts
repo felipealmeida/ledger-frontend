@@ -9,13 +9,16 @@ const api = axios.create({
 });
 
 export class LedgerApiService {
+
+
   /**
    * Get all account balances
    */
-  static async getBalance(file?: string, command?: string): Promise<LedgerBalanceResponse> {
+  static async getBalance(file?: string, command?: string, period?: string): Promise<LedgerBalanceResponse> {
     const params = new URLSearchParams();
     if (file) params.append('file', file);
     if (command) params.append('command', command);
+    if (period) params.append('period', period);
     
     const response = await api.get<LedgerBalanceResponse>(
       `/api/balance${params.toString() ? `?${params.toString()}` : ''}`
@@ -26,7 +29,7 @@ export class LedgerApiService {
   /**
    * Get balance for specific account
    */
-  static async getAccountBalance(account: string, file?: string): Promise<LedgerBalanceResponse> {
+  static async getAccountBalance(account: string, file?: string, period?: string): Promise<LedgerBalanceResponse> {
     const params = file ? `?file=${encodeURIComponent(file)}` : '';
     const response = await api.get<LedgerBalanceResponse>(
       `/api/balance/${encodeURIComponent(account)}${params}`

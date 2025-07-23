@@ -12,6 +12,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [currentPeriod, setCurrentPeriod] = useState('');
   
   // Controls state
   const [currentFile, setCurrentFile] = useState('main.ledger');
@@ -27,7 +28,7 @@ function App() {
     setError(null);
     
     try {
-      const response = await LedgerApiService.getBalance(currentFile, currentCommand);
+      const response = await LedgerApiService.getBalance(currentFile, currentCommand, currentPeriod || undefined);
       setData(response);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load data');
@@ -66,6 +67,11 @@ function App() {
     } else {
       loadData();
     }
+  };
+
+  const handlePeriodChange = (period: string) => {
+    setCurrentPeriod(period);
+    setSelectedAccount('');
   };
 
   const handleFileChange = (file: string) => {
@@ -133,10 +139,12 @@ function App() {
           onRefresh={handleRefresh}
           onFileChange={handleFileChange}
           onCommandChange={handleCommandChange}
+          onPeriodChange={handlePeriodChange}
           onAccountSearch={handleAccountSearch}
           isLoading={isLoading}
           currentFile={currentFile}
           currentCommand={currentCommand}
+          currentPeriod={currentPeriod}
         />
 
         {/* Error Message */}
