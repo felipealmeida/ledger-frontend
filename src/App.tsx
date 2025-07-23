@@ -274,6 +274,9 @@ function App() {
                         <div className={`font-mono ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {tx.formattedAmount}
                     </div>
+                        <div className={`font-mono ${tx.runningBalance > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {tx.formattedRunningBalance}
+                    </div>
                         </div>
                 ))}
             </div>

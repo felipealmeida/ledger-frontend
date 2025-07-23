@@ -42,5 +42,6 @@ export interface Transaction {
   description: string;
   amount: number;
   formattedAmount: string;
-  account: string;
+  runningBalance: number;
+  formattedRunningBlanace: string;
 }
