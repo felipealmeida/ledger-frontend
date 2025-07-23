@@ -9,28 +9,45 @@ interface BalanceSummaryProps {
 
 export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts, currency }) => {
   const calculateSummary = () => {
-    const topLevelAccounts = accounts.filter(acc => acc.indentLevel === 0);
+    // Use all accounts and check their full path to categorize them
+    const assets = accounts
+      .filter(acc => {
+        const path = (acc.fullPath || acc.account).toLowerCase();
+        return path.startsWith('ativos');
+      })
+      .reduce((sum, acc) => sum + acc.amount, 0);
     
-    const assets = topLevelAccounts
-      .filter(acc => acc.account.toLowerCase().includes('ativo') || acc.amount > 0)
+    const expenses = accounts
+      .filter(acc => {
+        const path = (acc.fullPath || acc.account).toLowerCase();
+        return path.startsWith('despesas');
+      })
+      .reduce((sum, acc) => sum + acc.amount, 0);
+    
+    const liabilities = accounts
+      .filter(acc => {
+        const path = (acc.fullPath || acc.account).toLowerCase();
+        return path.startsWith('passivo');
+      })
+      .reduce((sum, acc) => sum + acc.amount, 0);
+    
+    const income = accounts
+      .filter(acc => {
+        const path = (acc.fullPath || acc.account).toLowerCase();
+        return path.startsWith('receitas');
+      })
       .reduce((sum, acc) => sum + Math.abs(acc.amount), 0);
     
-    const liabilities = topLevelAccounts
-      .filter(acc => acc.account.toLowerCase().includes('passivo') || 
-                     acc.account.toLowerCase().includes('despesa') ||
-                     (acc.amount < 0 && !acc.account.toLowerCase().includes('receita')))
-      .reduce((sum, acc) => sum + Math.abs(acc.amount), 0);
-    
-    const income = topLevelAccounts
-      .filter(acc => acc.account.toLowerCase().includes('receita'))
-      .reduce((sum, acc) => sum + Math.abs(acc.amount), 0);
-    
-    const netWorth = assets - liabilities;
-    
-    return { assets, liabilities, income, netWorth };
+    // Note: expenses are already positive in ledger, liabilities are negative
+    return { 
+      assets: Math.abs(assets), 
+      liabilities: Math.abs(liabilities), 
+      income: income,
+      expenses: Math.abs(expenses),
+    };
   };
 
-  const { assets, liabilities, income, netWorth } = calculateSummary();
+  const { assets, liabilities, income, expenses } = calculateSummary();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -77,17 +94,17 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts, curren
       />
       
       <SummaryCard
+        title="Despesas"
+        amount={expenses}
+        icon={<TrendingDown className="h-6 w-6 text-orange-600" />}
+        color="border-l-orange-500"
+      />
+      
+      <SummaryCard
         title="Receitas"
         amount={income}
         icon={<DollarSign className="h-6 w-6 text-blue-600" />}
         color="border-l-blue-500"
-      />
-      
-      <SummaryCard
-        title="Patrimônio Líquido"
-        amount={netWorth}
-        icon={<DollarSign className="h-6 w-6 text-purple-600" />}
-        color="border-l-purple-500"
       />
     </div>
   );

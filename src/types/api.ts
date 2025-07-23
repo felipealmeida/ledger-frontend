@@ -2,8 +2,8 @@ export interface LedgerAccount {
   account: string;
   amount: number;
   formattedAmount: string;
-  indentLevel: number;
-  isSubAccount: boolean;
+  children: LedgerAccount[];
+  fullPath: string;
 }
 
 export interface LedgerBalanceResponse {
@@ -28,4 +28,19 @@ export interface HealthResponse {
 export interface ApiError {
   error: string;
   details?: any;
+}
+
+export interface TransactionData {
+  transactions: Transaction[];
+  account: string;
+  period?: string;
+  timestamp: string;
+}
+
+export interface Transaction {
+  date: string;
+  description: string;
+  amount: number;
+  formattedAmount: string;
+  account: string;
 }
