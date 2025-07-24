@@ -13,12 +13,6 @@ export interface LedgerBalanceResponse {
   total: number;
 }
 
-export interface ValidationResponse {
-  file: string;
-  valid: boolean;
-  timestamp: string;
-}
-
 export interface HealthResponse {
   status: string;
   timestamp: string;

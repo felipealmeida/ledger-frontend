@@ -15,7 +15,6 @@ function App() {
     const [currentPeriod, setCurrentPeriod] = useState('');
     
     // Controls state
-    const [currentFile, setCurrentFile] = useState('main.ledger');
     const [currentCommand, setCurrentCommand] = useState('bal');
 
     const [transactionData, setTransactionData] = useState<TransactionData | any>(null);
@@ -30,7 +29,7 @@ function App() {
         setError(null);
         
         try {
-            const response = await LedgerApiService.getBalance(currentFile, currentCommand, currentPeriod || undefined);
+            const response = await LedgerApiService.getBalance(currentCommand, currentPeriod || undefined);
             setData(response);
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to load data');
@@ -60,7 +59,6 @@ function App() {
                 // CALL transactions API
                 response = await LedgerApiService.getAccountTransactions(
                     account, 
-                    currentFile,
                     currentPeriod || undefined
                 );
                 setTransactionData(response); // ADD this state
@@ -69,7 +67,6 @@ function App() {
                 // CALL balance API as before
                 response = await LedgerApiService.getAccountBalance(
                     account, 
-                    currentFile,
                     currentPeriod || undefined
                 );
                 setData(response);
@@ -92,11 +89,6 @@ function App() {
 
     const handlePeriodChange = (period: string) => {
         setCurrentPeriod(period);
-        setSelectedAccount('');
-    };
-
-    const handleFileChange = (file: string) => {
-        setCurrentFile(file);
         setSelectedAccount('');
     };
 
@@ -158,12 +150,10 @@ function App() {
             {/* Controls */}
             <Controls
         onRefresh={handleRefresh}
-        onFileChange={handleFileChange}
         onCommandChange={handleCommandChange}
         onPeriodChange={handlePeriodChange}
         onAccountSearch={handleAccountSearch}
         isLoading={isLoading}
-        currentFile={currentFile}
         currentCommand={currentCommand}
         currentPeriod={currentPeriod}
             />
@@ -219,7 +209,7 @@ function App() {
                 {selectedAccount ? `Account: ${selectedAccount}` : 'All Accounts'}
             </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                File: {currentFile} | Command: {currentCommand}
+                Command: {currentCommand}
             </p>
                 </div>
                 

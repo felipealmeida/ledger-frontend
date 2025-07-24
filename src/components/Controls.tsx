@@ -3,24 +3,20 @@ import { RefreshCw, Search, FileText, Activity, Calendar } from 'lucide-react';
 
 interface ControlsProps {
   onRefresh: () => void;
-  onFileChange: (file: string) => void;
   onCommandChange: (command: string) => void;
   onAccountSearch: (account: string) => void;
   onPeriodChange: (period: string) => void;
   isLoading: boolean;
-  currentFile: string;
   currentCommand: string;
   currentPeriod: string;
 }
 
 export const Controls: React.FC<ControlsProps> = ({
   onRefresh,
-  onFileChange,
   onCommandChange,
   onPeriodChange,
   onAccountSearch,
   isLoading,
-  currentFile,
   currentCommand,
   currentPeriod
 }) => {
@@ -42,21 +38,6 @@ export const Controls: React.FC<ControlsProps> = ({
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
       {/* Top Row - Main Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-        {/* File Input */}
-        <div className="space-y-2">
-          <label className="flex items-center text-sm font-medium text-gray-700">
-            <FileText className="h-4 w-4 mr-1" />
-            Ledger File
-          </label>
-          <input
-            type="text"
-            value={currentFile}
-            onChange={(e) => onFileChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="main.ledger"
-          />
-        </div>
-
         {/* Command Input */}
         <div className="space-y-2">
           <label className="flex items-center text-sm font-medium text-gray-700">
