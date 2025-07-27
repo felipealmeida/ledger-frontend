@@ -28,18 +28,21 @@ const buildTreeFromPaths = (accounts: LedgerAccount[]): LedgerAccount[] => {
     let currentPath = '';
     for (let i = 0; i < parts.length - 1; i++) {
       currentPath = currentPath ? `${currentPath}:${parts[i]}` : parts[i];
-      
+
       if (!nodeMap.has(currentPath)) {
         nodeMap.set(currentPath, {
           account: parts[i],
           fullPath: currentPath,
           amount: 0,
           formattedAmount: 'BRL 0.00',
+          clearedAmount: 0,
+          formattedClearedAmount: 'BRL 0.00',
+          lastClearedDate: '',
           children: []
         });
       }
     }
-    
+
     // Add the actual account
     nodeMap.set(path, {
       ...account,
@@ -93,9 +96,38 @@ const buildTreeFromPaths = (accounts: LedgerAccount[]): LedgerAccount[] => {
       return childrenSum;
     }
   };
-  
-  // Calculate amounts for all root nodes
+
+  // Calculate parent amounts (sum of children)
+  const calculateParentClearedAmounts = (node: LedgerAccount): number => {
+    if (!node.children || node.children.length === 0) {
+      return node.clearedAmount;
+    }
+    
+    const childrenSum = node.children.reduce((sum, child) => {
+      return sum + calculateParentClearedAmounts(child);
+    }, 0);
+    
+    // If this node has its own ClearedAmount (from the original data), use it
+    // Otherwise, use the sum of children
+    const originalNode = accounts.find(acc => 
+      (acc.fullPath || acc.account) === (node.fullPath || node.account)
+    );
+    
+    if (originalNode) {
+      return node.clearedAmount;
+    } else {
+      node.clearedAmount = childrenSum;
+      node.formattedClearedAmount = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(childrenSum);
+      return childrenSum;
+    }
+  };
+
+  // Calculate ClearedAmounts for all root nodes
   tree.forEach(node => calculateParentAmounts(node));
+  tree.forEach(node => calculateParentClearedAmounts(node));
   
   // Sort children alphabetically
   const sortChildren = (node: LedgerAccount) => {
@@ -151,17 +183,17 @@ const AccountNode: React.FC<AccountNodeProps> = ({ account, onSelect, selectedAc
         <div>
             <div
                 className={`
-                    flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors
+                    grid grid-cols-4 gap-4 items-center py-2 border-b cursor-pointer transition-colors
                     ${isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : 'hover:bg-gray-50'}
                 `}
-                style={{ paddingLeft: `${paddingLeft + 8}px` }}
                 onClick={handleClick}
             >
-                <div className="flex items-center space-x-2 flex-1">
+                {/* Account Name Column with Tree Structure */}
+                <div className="flex items-center" style={{ paddingLeft: `${level * 20}px` }}>
                     {hasChildren && (
                         <button 
                             onClick={handleToggle}
-                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            className="p-1 hover:bg-gray-200 rounded transition-colors mr-1"
                         >
                             {isExpanded ? 
                                 <ChevronDown size={16} className="text-gray-600" /> : 
@@ -169,21 +201,24 @@ const AccountNode: React.FC<AccountNodeProps> = ({ account, onSelect, selectedAc
                             }
                         </button>
                     )}
-                    {!hasChildren && <div className="w-6" />}
-                    <span className="font-medium text-gray-800">
-                        {account.account}
-                    </span>
-                    {level > 0 && (
-                        <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                            Sub
-                        </span>
-                    )}
+                    <span className="font-medium">{account.account}</span>
                 </div>
                 
-                <div className="flex items-center space-x-3">
-                    <span className={`font-mono text-sm font-semibold ${getAmountColor(account.amount)}`}>
-                        {account.formattedAmount}
-                    </span>
+                {/* Last Cleared Date Column */}
+                <div className="text-sm text-gray-500">{account.lastClearedDate}</div>
+                
+                {/* Cleared Amount Column */}
+                <div
+                    className={`font-mono text-right ${account.clearedAmount > 0 ? 'text-green-600' : 'text-red-600'}`}
+                >
+                    {account.formattedClearedAmount}
+                </div>
+                
+                {/* Total Amount Column */}
+                <div
+                    className={`font-mono text-right ${account.amount > 0 ? 'text-green-600' : 'text-red-600'}`}
+                >
+                    {account.formattedAmount}
                 </div>
             </div>
             
