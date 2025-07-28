@@ -5,6 +5,7 @@ import { AccountTree } from './components/AccountTree';
 import { BalanceSummary } from './components/BalanceSummary';
 import { Controls } from './components/Controls';
 import { ExpenseChart } from './components/ExpenseChart';
+import { ExpensePieChart } from './components/ExpensePieChart';
 import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown } from 'lucide-react';
 
 function App() {
@@ -116,31 +117,8 @@ function App() {
         
         // Parse the formatted balance to get numeric value
         const parseBalance = (account: any): number => {
-            // Check different possible property names
-            let balanceStr = '';
-            
-            if (account.formattedBalance) {
-                balanceStr = account.formattedBalance;
-            } else if (account.balance && typeof account.balance === 'string') {
-                balanceStr = account.balance;
-            } else if (account.balance && typeof account.balance === 'number') {
-                return account.balance;
-            } else if (account.amount) {
-                if (typeof account.amount === 'string') {
-                    balanceStr = account.amount;
-                } else if (typeof account.amount === 'number') {
-                    return account.amount;
-                }
-            }
-            
-            // If we have a string, parse it
-            if (balanceStr) {
-                // Remove currency symbol and thousands separators, replace comma with dot
-                const cleanedValue = balanceStr
-                    .replace(/[R$\s]/g, '')
-                    .replace(/\./g, '')
-                    .replace(',', '.');
-                return parseFloat(cleanedValue) || 0;
+            if (account.amount && typeof account.amount === 'number') {
+                return account.amount;
             }
             
             return 0;
@@ -148,26 +126,23 @@ function App() {
         
         // Get formatted balance string
         const getFormattedBalance = (account: any): string => {
-            return account.formattedBalance || 
-                account.balance || 
-                account.amount || 
-                'R$ 0,00';
+            return account.formattedAmount || 'BRL 0.00';
         };
         
-        // Filter only negative balances (expenses) and sort by amount
+        // Filter only accounts where fullPath starts with "Despesas:" and have negative balances
         const expenses = accountsWithBalance
+            .filter(account => account.fullPath && account.fullPath.startsWith('Despesas:'))
             .map(account => ({
                 account: account.account || account.name || 'Unknown',
-                numericBalance: parseBalance(account),
-                formattedBalance: getFormattedBalance(account)
+                amount: parseBalance(account),
+                formattedAmount: getFormattedBalance(account)
             }))
-            .filter(item => item.numericBalance < 0)
-            .sort((a, b) => a.numericBalance - b.numericBalance) // Sort ascending (most negative first)
+            .sort((a, b) => b.amount - a.amount) // Sort ascending (most negative first)
             .slice(0, 10)
             .map(item => ({
                 account: item.account,
-                amount: Math.abs(item.numericBalance),
-                formattedAmount: item.formattedBalance
+                amount: Math.abs(item.amount),
+                formattedAmount: item.formattedAmount
             }));
         
         return expenses;
@@ -277,12 +252,18 @@ showExpenseChart
         {/* Content */}
         {data && !isLoading && (
             <>
-                {/* Show Expense Chart or Normal View */}
+                {/* Show Expense Charts or Normal View */}
             {showExpenseChart && !selectedAccount && !transactionData ? (
-                <ExpenseChart 
+                <div className="space-y-6">
+                    <ExpensePieChart 
                 expenses={getTop10Expenses()} 
                 currency={data.currency} 
                     />
+                    <ExpenseChart 
+                expenses={getTop10Expenses()} 
+                currency={data.currency} 
+                    />
+                    </div>
             ) : (
                 <>
                     {/* Balance Summary */}
