@@ -4,7 +4,8 @@ import { LedgerBalanceResponse, HealthResponse, TransactionData } from './types/
 import { AccountTree } from './components/AccountTree';
 import { BalanceSummary } from './components/BalanceSummary';
 import { Controls } from './components/Controls';
-import { AlertCircle, CheckCircle, Clock, BarChart3 } from 'lucide-react';
+import { ExpenseChart } from './components/ExpenseChart';
+import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown } from 'lucide-react';
 
 function App() {
     const [data, setData] = useState<LedgerBalanceResponse | null>(null);
@@ -13,6 +14,7 @@ function App() {
     const [error, setError] = useState<string | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [currentPeriod, setCurrentPeriod] = useState('');
+    const [showExpenseChart, setShowExpenseChart] = useState(false);
     
     // Controls state
     const [currentCommand, setCurrentCommand] = useState('bal');
@@ -52,6 +54,7 @@ function App() {
         setIsLoading(true);
         setError(null);
         setSelectedAccount(account);
+        setShowExpenseChart(false); // Reset expense chart view
         
         try {
             let response;
@@ -90,11 +93,84 @@ function App() {
     const handlePeriodChange = (period: string) => {
         setCurrentPeriod(period);
         setSelectedAccount('');
+        setShowExpenseChart(false);
     };
 
     const handleCommandChange = (command: string) => {
         setCurrentCommand(command);
         setSelectedAccount('');
+        setShowExpenseChart(false);
+    };
+
+    const toggleExpenseChart = () => {
+        setShowExpenseChart(!showExpenseChart);
+        setSelectedAccount('');
+        setTransactionData(null);
+    };
+
+    const getTop10Expenses = () => {
+        if (!data || !data.accounts) return [];
+        
+        // Type assertion to any to work with the actual data structure
+        const accountsWithBalance = data.accounts as any[];
+        
+        // Parse the formatted balance to get numeric value
+        const parseBalance = (account: any): number => {
+            // Check different possible property names
+            let balanceStr = '';
+            
+            if (account.formattedBalance) {
+                balanceStr = account.formattedBalance;
+            } else if (account.balance && typeof account.balance === 'string') {
+                balanceStr = account.balance;
+            } else if (account.balance && typeof account.balance === 'number') {
+                return account.balance;
+            } else if (account.amount) {
+                if (typeof account.amount === 'string') {
+                    balanceStr = account.amount;
+                } else if (typeof account.amount === 'number') {
+                    return account.amount;
+                }
+            }
+            
+            // If we have a string, parse it
+            if (balanceStr) {
+                // Remove currency symbol and thousands separators, replace comma with dot
+                const cleanedValue = balanceStr
+                    .replace(/[R$\s]/g, '')
+                    .replace(/\./g, '')
+                    .replace(',', '.');
+                return parseFloat(cleanedValue) || 0;
+            }
+            
+            return 0;
+        };
+        
+        // Get formatted balance string
+        const getFormattedBalance = (account: any): string => {
+            return account.formattedBalance || 
+                account.balance || 
+                account.amount || 
+                'R$ 0,00';
+        };
+        
+        // Filter only negative balances (expenses) and sort by amount
+        const expenses = accountsWithBalance
+            .map(account => ({
+                account: account.account || account.name || 'Unknown',
+                numericBalance: parseBalance(account),
+                formattedBalance: getFormattedBalance(account)
+            }))
+            .filter(item => item.numericBalance < 0)
+            .sort((a, b) => a.numericBalance - b.numericBalance) // Sort ascending (most negative first)
+            .slice(0, 10)
+            .map(item => ({
+                account: item.account,
+                amount: Math.abs(item.numericBalance),
+                formattedAmount: item.formattedBalance
+            }));
+        
+        return expenses;
     };
 
     const StatusIndicator = () => (
@@ -148,6 +224,7 @@ function App() {
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Controls */}
+            <div className="mb-6">
             <Controls
         onRefresh={handleRefresh}
         onCommandChange={handleCommandChange}
@@ -157,6 +234,24 @@ function App() {
         currentCommand={currentCommand}
         currentPeriod={currentPeriod}
             />
+            
+            {/* Expense Chart Toggle Button */}
+        {data && !selectedAccount && !transactionData && (
+            <div className="mt-4 flex justify-center">
+                <button
+            onClick={toggleExpenseChart}
+            className={`flex items-center space-x-2 px-6 py-2 rounded-md transition-colors ${
+showExpenseChart 
+? 'bg-red-500 text-white hover:bg-red-600' 
+: 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+}`}
+                >
+                <TrendingDown className="h-5 w-5" />
+                <span>{showExpenseChart ? 'Show Account Balances' : 'Show Top 10 Expenses'}</span>
+                </button>
+                </div>
+        )}
+        </div>
 
             {/* Error Message */}
         {error && (
@@ -182,66 +277,76 @@ function App() {
         {/* Content */}
         {data && !isLoading && (
             <>
-                {/* Balance Summary */}
-            {!selectedAccount && (
-                <BalanceSummary 
-                accounts={data.accounts} 
+                {/* Show Expense Chart or Normal View */}
+            {showExpenseChart && !selectedAccount && !transactionData ? (
+                <ExpenseChart 
+                expenses={getTop10Expenses()} 
                 currency={data.currency} 
                     />
-            )}
-
-            {/* Selected Account Info */}
-            {selectedAccount && (
-                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h2 className="text-lg font-semibold text-blue-800 mb-2">
-                    Account Details: {selectedAccount}
-                </h2>
-                    <p className="text-blue-600">
-                Showing {data.accounts.length} entries for this account
-                </p>
-                    </div>
-            )}
-
-            {/* Account Tree */}
-                <div className="bg-white rounded-lg shadow-md">
-                <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold text-gray-800">
-                {selectedAccount ? `Account: ${selectedAccount}` : 'All Accounts'}
-            </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                Command: {currentCommand}
-            </p>
-                </div>
-                
-                <div className="p-6">
-                {data.accounts.length > 0 ? (
-                    <AccountTree
-                    accounts={data.accounts}
-                    onAccountSelect={handleAccountSearch}
-                    selectedAccount={selectedAccount}
+            ) : (
+                <>
+                    {/* Balance Summary */}
+                {!selectedAccount && !transactionData && (
+                    <BalanceSummary 
+                    accounts={data.accounts} 
+                    currency={data.currency} 
                         />
-                ) : (
-                    <div className="text-center py-8 text-gray-500">
-                        <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>No accounts found for the current query.</p>
+                )}
+
+                {/* Selected Account Info */}
+                {selectedAccount && (
+                    <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h2 className="text-lg font-semibold text-blue-800 mb-2">
+                        Account Details: {selectedAccount}
+                    </h2>
+                        <p className="text-blue-600">
+                        Showing {data.accounts.length} entries for this account
+                    </p>
                         </div>
                 )}
-            </div>
-                </div>
 
-                {/* Clear Selection */}
-            {selectedAccount && (
-                <div className="mt-6 text-center">
-                    <button
-                onClick={() => {
-                    setSelectedAccount('');
-                    loadData();
-                }}
-                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-                    >
-                    Show All Accounts
-                </button>
+                {/* Account Tree */}
+                    <div className="bg-white rounded-lg shadow-md">
+                    <div className="border-b border-gray-200 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-gray-800">
+                    {selectedAccount ? `Account: ${selectedAccount}` : 'All Accounts'}
+                </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                    Command: {currentCommand}
+                </p>
                     </div>
+                    
+                    <div className="p-6">
+                    {data.accounts.length > 0 ? (
+                        <AccountTree
+                        accounts={data.accounts}
+                        onAccountSelect={handleAccountSearch}
+                        selectedAccount={selectedAccount}
+                            />
+                    ) : (
+                        <div className="text-center py-8 text-gray-500">
+                            <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                            <p>No accounts found for the current query.</p>
+                            </div>
+                    )}
+                </div>
+                    </div>
+
+                    {/* Clear Selection */}
+                {selectedAccount && (
+                    <div className="mt-6 text-center">
+                        <button
+                    onClick={() => {
+                        setSelectedAccount('');
+                        loadData();
+                    }}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                        >
+                        Show All Accounts
+                    </button>
+                        </div>
+                )}
+                </>
             )}
             </>
         )}
