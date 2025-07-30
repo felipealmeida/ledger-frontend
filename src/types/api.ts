@@ -1,9 +1,7 @@
 export interface LedgerAccount {
   account: string;
   amount: number;
-  formattedAmount: string;
   clearedAmount: number;
-  formattedClearedAmount: string;
   lastClearedDate: string;
   children: LedgerAccount[];
   fullPath: string;
@@ -38,7 +36,5 @@ export interface Transaction {
   date: string;
   description: string;
   amount: number;
-  formattedAmount: string;
   runningBalance: number;
-  formattedRunningBlanace: string;
 }

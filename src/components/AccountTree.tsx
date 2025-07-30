@@ -34,9 +34,7 @@ const buildTreeFromPaths = (accounts: LedgerAccount[]): LedgerAccount[] => {
           account: parts[i],
           fullPath: currentPath,
           amount: 0,
-          formattedAmount: 'BRL 0.00',
           clearedAmount: 0,
-          formattedClearedAmount: 'BRL 0.00',
           lastClearedDate: '',
           children: []
         });
@@ -89,10 +87,6 @@ const buildTreeFromPaths = (accounts: LedgerAccount[]): LedgerAccount[] => {
       return node.amount;
     } else {
       node.amount = childrenSum;
-      node.formattedAmount = new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      }).format(childrenSum);
       return childrenSum;
     }
   };
@@ -117,10 +111,6 @@ const buildTreeFromPaths = (accounts: LedgerAccount[]): LedgerAccount[] => {
       return node.clearedAmount;
     } else {
       node.clearedAmount = childrenSum;
-      node.formattedClearedAmount = new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      }).format(childrenSum);
       return childrenSum;
     }
   };
@@ -211,14 +201,14 @@ const AccountNode: React.FC<AccountNodeProps> = ({ account, onSelect, selectedAc
                 <div
                     className={`font-mono text-right ${account.clearedAmount > 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
-                    {account.formattedClearedAmount}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL'}).format(account.clearedAmount)}
                 </div>
                 
                 {/* Total Amount Column */}
                 <div
                     className={`font-mono text-right ${account.amount > 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
-                    {account.formattedAmount}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL'}).format(account.amount)}
                 </div>
             </div>
             

@@ -115,7 +115,7 @@ function App() {
         // Type assertion to any to work with the actual data structure
         const accountsWithBalance = data.accounts as any[];
         
-        // Parse the formatted balance to get numeric value
+        // Parse the balance to get numeric value
         const parseBalance = (account: any): number => {
             if (account.amount && typeof account.amount === 'number') {
                 return account.amount;
@@ -124,25 +124,18 @@ function App() {
             return 0;
         };
         
-        // Get formatted balance string
-        const getFormattedBalance = (account: any): string => {
-            return account.formattedAmount || 'BRL 0.00';
-        };
-        
         // Filter only accounts where fullPath starts with "Despesas:" and have negative balances
         const expenses = accountsWithBalance
             .filter(account => account.fullPath && account.fullPath.startsWith('Despesas:'))
             .map(account => ({
                 account: account.account || account.name || 'Unknown',
-                amount: parseBalance(account),
-                formattedAmount: getFormattedBalance(account)
+                amount: parseBalance(account)
             }))
             .sort((a, b) => b.amount - a.amount) // Sort ascending (most negative first)
             .slice(0, 10)
             .map(item => ({
                 account: item.account,
-                amount: Math.abs(item.amount),
-                formattedAmount: item.formattedAmount
+                amount: Math.abs(item.amount)
             }));
         
         return expenses;
@@ -357,12 +350,12 @@ showExpenseChart
                         <div
                     className={`font-mono text-left ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                        {tx.formattedAmount}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.amount)}
                     </div>
                         <div
                     className={`font-mono text-left ${tx.runningBalance > 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                        {tx.formattedRunningBalance}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.runningBalance)}
                     </div>
                         </div>
                 ))}

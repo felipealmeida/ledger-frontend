@@ -5,7 +5,6 @@ import { TrendingDown } from 'lucide-react';
 interface ExpenseData {
     account: string;
     amount: number;
-    formattedAmount: string;
 }
 
 interface ExpensePieChartProps {
@@ -142,7 +141,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ expenses, curr
                             {expense.percentage}%
                             </span>
                             <span className="font-mono text-red-600 font-medium text-sm">
-                            {expense.formattedAmount}
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL'}).format(expense.amount)}
                         </span>
                             </div>
                             </div>

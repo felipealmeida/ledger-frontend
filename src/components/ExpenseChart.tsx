@@ -5,7 +5,6 @@ import { TrendingDown } from 'lucide-react';
 interface ExpenseData {
     account: string;
     amount: number;
-    formattedAmount: string;
 }
 
 interface ExpenseChartProps {
@@ -95,7 +94,7 @@ export const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenses, currency }
                                             </span>
                                         </div>
                                         <span className="font-mono text-red-600 font-medium">
-                                            {expense.formattedAmount}
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL'}).format(expense.amount)}
                                         </span>
                                     </div>
                                 ))}
