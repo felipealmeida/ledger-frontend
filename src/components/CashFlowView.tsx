@@ -1,24 +1,216 @@
-// CashFlowView.tsx
-import React from 'react';
-import { LedgerSubTotalNode } from '../types/api';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { TrendingUp, TrendingDown, ChevronRight, ChevronDown } from 'lucide-react';
+
+// Types
+interface LedgerSubTotalNode {
+    description: string;
+    inflow_amount: number;
+    outflow_amount: number;
+    runningBalance?: number;
+}
+
+interface CashFlowTreeNode extends LedgerSubTotalNode {
+    path: string;
+    level: number;
+    children: CashFlowTreeNode[];
+    isParent: boolean;
+}
 
 interface CashFlowViewProps {
     subtotals: LedgerSubTotalNode[];
     currency: string;
 }
 
-export const CashFlowView: React.FC<CashFlowViewProps> = ({ subtotals, currency }) => {
+// Build tree from flat list based on description paths
+const buildCashFlowTree = (subtotals: LedgerSubTotalNode[]): CashFlowTreeNode[] => {
+    const tree: CashFlowTreeNode[] = [];
+    const nodeMap = new Map<string, CashFlowTreeNode>();
+    
+    // First pass: create all nodes
+    subtotals.forEach(item => {
+        const path = item.description;
+        const parts = path.split(':');
+        const level = parts.length - 1;
+        
+        // Create parent nodes if they don't exist
+        let currentPath = '';
+        for (let i = 0; i < parts.length; i++) {
+            currentPath = currentPath ? `${currentPath}:${parts[i]}` : parts[i];
+            
+            if (!nodeMap.has(currentPath)) {
+                const isLeaf = i === parts.length - 1;
+                nodeMap.set(currentPath, {
+                    description: parts[i].trim(),
+                    path: currentPath,
+                    level: i,
+                    inflow_amount: isLeaf ? item.inflow_amount : 0,
+                    outflow_amount: isLeaf ? item.outflow_amount : 0,
+                    runningBalance: isLeaf ? item.runningBalance : 0,
+                    children: [],
+                    isParent: !isLeaf
+                });
+            }
+        }
+    });
+    
+    // Second pass: build tree structure
+    nodeMap.forEach((node, path) => {
+        const parts = path.split(':');
+        
+        if (parts.length === 1) {
+            tree.push(node);
+        } else {
+            const parentPath = parts.slice(0, -1).join(':');
+            const parent = nodeMap.get(parentPath);
+            if (parent) {
+                parent.children.push(node);
+                parent.isParent = true;
+            }
+        }
+    });
+    
+    // Calculate parent amounts (sum of children)
+    const calculateParentAmounts = (node: CashFlowTreeNode): void => {
+        if (node.children.length > 0) {
+            let inflowSum = 0;
+            let outflowSum = 0;
+            
+            node.children.forEach(child => {
+                calculateParentAmounts(child);
+                inflowSum += child.inflow_amount;
+                outflowSum += child.outflow_amount;
+            });
+            
+            // Only update if this is a parent node (not original data)
+            if (node.isParent) {
+                node.inflow_amount = inflowSum;
+                node.outflow_amount = outflowSum;
+            }
+        }
+    };
+    
+    tree.forEach(calculateParentAmounts);
+    
+    // Sort children alphabetically
+    const sortChildren = (node: CashFlowTreeNode) => {
+        if (node.children.length > 0) {
+            node.children.sort((a, b) => a.description.localeCompare(b.description));
+            node.children.forEach(sortChildren);
+        }
+    };
+    
+    tree.forEach(sortChildren);
+    tree.sort((a, b) => a.description.localeCompare(b.description));
+    
+    return tree;
+};
+
+// Tree node component
+const CashFlowTreeNodeComponent: React.FC<{
+    node: CashFlowTreeNode;
+    formatCurrency: (amount: number) => string;
+    expandedPaths: Set<string>;
+    onToggleExpand: (path: string) => void;
+}> = ({ node, formatCurrency, expandedPaths, onToggleExpand }) => {
+    const isExpanded = expandedPaths.has(node.path);
+    const hasChildren = node.children.length > 0;
+    
+    const handleToggle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (hasChildren) {
+            onToggleExpand(node.path);
+        }
+    };
+    
+    return (
+        <>
+            <tr className="border-b hover:bg-gray-50">
+                <td className="py-2 px-4" style={{ paddingLeft: `${node.level * 24 + 16}px` }}>
+                    <div className="flex items-center">
+                        {hasChildren && (
+                            <button
+                                onClick={handleToggle}
+                                className="p-1 hover:bg-gray-200 rounded transition-colors mr-2"
+                            >
+                                {isExpanded ? 
+                                    <ChevronDown size={16} className="text-gray-600" /> : 
+                                    <ChevronRight size={16} className="text-gray-600" />
+                                }
+                            </button>
+                        )}
+                        <span className={hasChildren ? 'font-semibold' : ''}>{node.description}</span>
+                    </div>
+                </td>
+                <td className="text-right py-2 px-4 text-green-600">
+                    {node.inflow_amount > 0 ? formatCurrency(node.inflow_amount) : '-'}
+                </td>
+                <td className="text-right py-2 px-4 text-red-600">
+                    {node.outflow_amount < 0 ? formatCurrency(Math.abs(node.outflow_amount)) : '-'}
+                </td>
+            </tr>
+            
+            {isExpanded && hasChildren && node.children.map((child, index) => (
+                <CashFlowTreeNodeComponent
+                    key={`${child.path}-${index}`}
+                    node={child}
+                    formatCurrency={formatCurrency}
+                    expandedPaths={expandedPaths}
+                    onToggleExpand={onToggleExpand}
+                />
+            ))}
+        </>
+    );
+};
+
+export default function CashFlowView({ subtotals, currency }: CashFlowViewProps) {
+    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+    const [expandAll, setExpandAll] = useState(false);
+    
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('pt-BR', { 
             style: 'currency', 
             currency: currency || 'BRL' 
         }).format(amount);
     };
-
+    
+    // Build tree structure
+    const treeData = useMemo(() => buildCashFlowTree(subtotals), [subtotals]);
+    
+    // Calculate totals
     const totalInflow = subtotals.reduce((sum, item) => sum + item.inflow_amount, 0);
     const totalOutflow = subtotals.reduce((sum, item) => sum + Math.abs(item.outflow_amount), 0);
     const netFlow = totalInflow - totalOutflow;
+    
+    const handleToggleExpand = (path: string) => {
+        setExpandedPaths(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(path)) {
+                newSet.delete(path);
+            } else {
+                newSet.add(path);
+            }
+            return newSet;
+        });
+    };
+    
+    const handleExpandAll = () => {
+        if (expandAll) {
+            setExpandedPaths(new Set());
+        } else {
+            const allPaths = new Set<string>();
+            const collectPaths = (nodes: CashFlowTreeNode[]) => {
+                nodes.forEach(node => {
+                    if (node.children.length > 0) {
+                        allPaths.add(node.path);
+                        collectPaths(node.children);
+                    }
+                });
+            };
+            collectPaths(treeData);
+            setExpandedPaths(allPaths);
+        }
+        setExpandAll(!expandAll);
+    };
 
     return (
         <div className="space-y-6">
@@ -69,8 +261,14 @@ export const CashFlowView: React.FC<CashFlowViewProps> = ({ subtotals, currency 
 
             {/* Cash Flow Items */}
             <div className="bg-white rounded-lg shadow-md">
-                <div className="border-b border-gray-200 px-6 py-4">
+                <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
                     <h2 className="text-lg font-semibold text-gray-800">Cash Flow Details</h2>
+                    <button
+                        onClick={handleExpandAll}
+                        className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                        {expandAll ? 'Collapse All' : 'Expand All'}
+                    </button>
                 </div>
                 <div className="p-6">
                     <div className="overflow-x-auto">
@@ -83,16 +281,14 @@ export const CashFlowView: React.FC<CashFlowViewProps> = ({ subtotals, currency 
                                 </tr>
                             </thead>
                             <tbody>
-                                {subtotals.map((item, index) => (
-                                    <tr key={index} className="border-b hover:bg-gray-50">
-                                        <td className="py-2 px-4">{item.description}</td>
-                                        <td className="text-right py-2 px-4 text-green-600">
-                                            {item.inflow_amount > 0 ? formatCurrency(item.inflow_amount) : '-'}
-                                        </td>
-                                        <td className="text-right py-2 px-4 text-red-600">
-                                            {item.outflow_amount < 0 ? formatCurrency(Math.abs(item.outflow_amount)) : '-'}
-                                        </td>
-                                    </tr>
+                                {treeData.map((node, index) => (
+                                    <CashFlowTreeNodeComponent
+                                        key={`${node.path}-${index}`}
+                                        node={node}
+                                        formatCurrency={formatCurrency}
+                                        expandedPaths={expandedPaths}
+                                        onToggleExpand={handleToggleExpand}
+                                    />
                                 ))}
                             </tbody>
                         </table>
@@ -101,4 +297,4 @@ export const CashFlowView: React.FC<CashFlowViewProps> = ({ subtotals, currency 
             </div>
         </div>
     );
-};
+}

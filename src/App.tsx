@@ -6,7 +6,7 @@ import { BalanceSummary } from './components/BalanceSummary';
 import { Controls } from './components/Controls';
 import { ExpenseChart } from './components/ExpenseChart';
 import { ExpensePieChart } from './components/ExpensePieChart';
-import { CashFlowView } from './components/CashFlowView';
+import CashFlowView from './components/CashFlowView';
 import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown } from 'lucide-react';
 
 function App() {
