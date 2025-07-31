@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { LedgerBalanceResponse, HealthResponse } from '../types/api';
+import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse } from '../types/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -58,6 +58,23 @@ export class LedgerApiService {
      */
     static async getApiDocs(): Promise<any> {
         const response = await api.get('/');
+        return response.data;
+    }
+
+
+    static async getCashFlow(period?: string): Promise<LedgerSubTotalsResponse> {
+        const params = new URLSearchParams();
+        if (period) params.append('period', period);
+        
+        const response = await axios.get(`${API_BASE_URL}/api/cash-flow?${params}`);
+        return response.data;
+    }
+
+    static async getAccountCashFlow(account: string, period?: string): Promise<LedgerSubTotalsResponse> {
+        const params = new URLSearchParams();
+        if (period) params.append('period', period);
+        
+        const response = await axios.get(`${API_BASE_URL}/api/cash-flow/${encodeURIComponent(account)}?${params}`);
         return response.data;
     }
 }

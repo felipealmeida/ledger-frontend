@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { LedgerApiService } from './services/apiService';
-import { LedgerBalanceResponse, HealthResponse, TransactionData } from './types/api';
+import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, TransactionData } from './types/api';
 import { AccountTree } from './components/AccountTree';
 import { BalanceSummary } from './components/BalanceSummary';
 import { Controls } from './components/Controls';
 import { ExpenseChart } from './components/ExpenseChart';
 import { ExpensePieChart } from './components/ExpensePieChart';
+import { CashFlowView } from './components/CashFlowView';
 import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown } from 'lucide-react';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
     const [currentCommand, setCurrentCommand] = useState('bal');
 
     const [transactionData, setTransactionData] = useState<TransactionData | any>(null);
+    const [cashFlowData, setCashFlowData] = useState<LedgerSubTotalsResponse | null>(null);
 
     useEffect(() => {
         loadData();
@@ -32,8 +34,17 @@ function App() {
         setError(null);
         
         try {
-            const response = await LedgerApiService.getBalance(currentCommand, currentPeriod || undefined);
-            setData(response);
+            if (currentCommand === 'flow') {
+                const response = await LedgerApiService.getCashFlow(currentPeriod || undefined);
+                setCashFlowData(response);
+                setData(null);
+                setTransactionData(null);
+            } else {
+                const response = await LedgerApiService.getBalance(currentCommand, currentPeriod || undefined);
+                setData(response);
+                setCashFlowData(null);
+                setTransactionData(null);
+            }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to load data');
         } finally {
@@ -50,31 +61,38 @@ function App() {
         }
     };
 
-    // CHANGE handleAccountSearch function signature and logic:
     const handleAccountSearch = async (account: string, showTransactions: boolean = false) => {
         setIsLoading(true);
         setError(null);
         setSelectedAccount(account);
-        setShowExpenseChart(false); // Reset expense chart view
+        setShowExpenseChart(false);
         
         try {
             let response;
-            if (showTransactions) {
-                // CALL transactions API
+            if (currentCommand === 'fluxo') {
+                response = await LedgerApiService.getAccountCashFlow(
+                    account, 
+                    currentPeriod || undefined
+                );
+                setCashFlowData(response);
+                setData(null);
+                setTransactionData(null);
+            } else if (showTransactions) {
                 response = await LedgerApiService.getAccountTransactions(
                     account, 
                     currentPeriod || undefined
                 );
-                setTransactionData(response); // ADD this state
+                setTransactionData(response);
                 setData(null);
+                setCashFlowData(null);
             } else {
-                // CALL balance API as before
                 response = await LedgerApiService.getAccountBalance(
                     account, 
                     currentPeriod || undefined
                 );
                 setData(response);
-                setTransactionData(null); // ADD this state
+                setTransactionData(null);
+                setCashFlowData(null);
             }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to search account');
@@ -323,6 +341,14 @@ showExpenseChart
                 </>
             )}
             </>
+        )}
+
+        {/* Cash Flow state */}
+        {cashFlowData && !isLoading && (
+            <CashFlowView 
+            subtotals={cashFlowData.subtotals} 
+            currency="BRL" 
+                />
         )}
 
         {/* Transaction State */}

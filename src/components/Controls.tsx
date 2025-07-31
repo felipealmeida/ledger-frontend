@@ -49,11 +49,8 @@ export const Controls: React.FC<ControlsProps> = ({
             onChange={(e) => onCommandChange(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="bal">Balance (bal)</option>
-            <option value="bal Assets">Assets Only</option>
-            <option value="bal Liabilities">Liabilities Only</option>
-            <option value="bal Income">Income Only</option>
-            <option value="bal Expenses">Expenses Only</option>
+            <option value="bal">Balance</option>
+            <option value="flow">Fluxo</option>
             <option value="reg">Register (reg)</option>
           </select>
         </div>

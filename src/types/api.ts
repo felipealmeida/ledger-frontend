@@ -38,3 +38,17 @@ export interface Transaction {
   amount: number;
   runningBalance: number;
 }
+
+export interface LedgerSubTotalNode {
+    description: string;
+    inflow_amount: number;
+    outflow_amount: number;
+    runningBalance: number;
+}
+
+export interface LedgerSubTotalsResponse {
+    subtotals: LedgerSubTotalNode[];
+    period?: string;
+    account: string;
+    timestamp: string;
+}
