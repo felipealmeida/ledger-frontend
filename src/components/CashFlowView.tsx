@@ -91,16 +91,23 @@ const buildCashFlowTree = (subtotals: LedgerSubTotalNode[]): CashFlowTreeNode[] 
     
     tree.forEach(calculateParentAmounts);
     
-    // Sort children alphabetically
+    // Sort children by amount (largest first), but not at root level
     const sortChildren = (node: CashFlowTreeNode) => {
         if (node.children.length > 0) {
-            node.children.sort((a, b) => a.description.localeCompare(b.description));
+            node.children.sort((a, b) => {
+                // Calculate net amount for each node (inflow - outflow)
+                const aNet = a.inflow_amount + a.outflow_amount; // outflow is negative
+                const bNet = b.inflow_amount + b.outflow_amount;
+                
+                // Sort by absolute value, largest first
+                return Math.abs(bNet) - Math.abs(aNet);
+            });
             node.children.forEach(sortChildren);
         }
     };
     
     tree.forEach(sortChildren);
-    tree.sort((a, b) => a.description.localeCompare(b.description));
+    // Don't sort root level - keep original order
     
     return tree;
 };
@@ -163,9 +170,6 @@ const CashFlowTreeNodeComponent: React.FC<{
 };
 
 export default function CashFlowView({ subtotals, currency }: CashFlowViewProps) {
-    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-    const [expandAll, setExpandAll] = useState(false);
-    
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('pt-BR', { 
             style: 'currency', 
@@ -175,6 +179,23 @@ export default function CashFlowView({ subtotals, currency }: CashFlowViewProps)
     
     // Build tree structure
     const treeData = useMemo(() => buildCashFlowTree(subtotals), [subtotals]);
+    
+    // Initialize with all paths expanded
+    const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
+        const allPaths = new Set<string>();
+        const collectPaths = (nodes: CashFlowTreeNode[]) => {
+            nodes.forEach(node => {
+                if (node.children.length > 0) {
+                    allPaths.add(node.path);
+                    collectPaths(node.children);
+                }
+            });
+        };
+        collectPaths(treeData);
+        return allPaths;
+    });
+    
+    const [expandAll, setExpandAll] = useState(true);
     
     // Calculate totals
     const totalInflow = subtotals.reduce((sum, item) => sum + item.inflow_amount, 0);
@@ -298,3 +319,4 @@ export default function CashFlowView({ subtotals, currency }: CashFlowViewProps)
         </div>
     );
 }
+
