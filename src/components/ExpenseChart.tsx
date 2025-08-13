@@ -5,13 +5,13 @@ import { TrendingDown } from 'lucide-react';
 interface ExpenseData {
     account: string;
     amount: number;
-    isOthers?: boolean; // Optional property for the "Others" category
+    isOthers?: boolean;
 }
 
 interface ExpenseChartProps {
     expenses: ExpenseData[];
     currency: string;
-    maxItems?: number; // New prop to control how many items to show
+    maxItems?: number;
 }
 
 const ExpenseChart: React.FC<ExpenseChartProps> = ({ 
@@ -19,12 +19,11 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
     currency, 
     maxItems = 10 
 }) => {
-    // Colors for the bars - red gradient with a special color for "Others"
     const colors = [
         '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca',
         '#fee2e2', '#fef2f2', '#fffbfb', '#ffffff', '#ffffff'
     ];
-    const othersColor = '#6b7280'; // Gray color for "Others" category
+    const othersColor = '#6b7280';
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', {
@@ -33,20 +32,15 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
         }).format(Math.abs(value));
     };
 
-    // Process expenses to create the chart data
     const processedExpenses = React.useMemo((): ExpenseData[] => {
         if (expenses.length <= maxItems) {
             return expenses;
         }
 
-        // Take the top (maxItems - 1) expenses
         const topExpenses = expenses.slice(0, maxItems - 1);
-        
-        // Sum the remaining expenses
         const remainingExpenses = expenses.slice(maxItems - 1);
         const othersSum = remainingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
         
-        // Add "Others" category
         const othersCategory: ExpenseData = {
             account: `Others (${remainingExpenses.length} accounts)`,
             amount: othersSum,
@@ -55,6 +49,35 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
 
         return [...topExpenses, othersCategory];
     }, [expenses, maxItems]);
+
+    // Calculate which expenses represent 80% of total
+    const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const seventyFivePercent = totalAmount * 0.80;
+    
+    const expensesWithCumulative = React.useMemo(() => {
+        let cumulativeAmount = 0;
+        return processedExpenses.map((expense, index) => {
+            cumulativeAmount += expense.amount;
+            return {
+                ...expense,
+                isInTop80: cumulativeAmount < seventyFivePercent
+            };
+        });
+    }, [processedExpenses, seventyFivePercent]);
+
+    const top80Total = React.useMemo(() => {
+        return processedExpenses.reduce((accumulator, expense) => {
+            if (accumulator < seventyFivePercent)
+                accumulator += expense.amount;
+            return accumulator;
+        }, 0);
+    }, [processedExpenses, seventyFivePercent]);
+
+    const top80Percentage = React.useMemo(() => {
+        return (top80Total / processedExpenses.reduce((accumulator, expense) => {
+            return accumulator + expense.amount;
+        }, 0))*100;
+    }, [processedExpenses, top80Total]);
 
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload[0]) {
@@ -103,10 +126,11 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
             <div className="p-6">
             {processedExpenses.length > 0 ? (
                 <>
+                    <div className="relative">
                     <ResponsiveContainer width="100%" height={400}>
                     <BarChart
-                data={processedExpenses}
-                margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                data={expensesWithCumulative}
+                margin={{ top: 40, right: 30, left: 20, bottom: 100 }}
                     >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
@@ -123,23 +147,49 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
                     />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                    {processedExpenses.map((entry: ExpenseData, index: number) => (
+                    {expensesWithCumulative.map((entry: any, index: number) => (
                         <Cell 
                         key={`cell-${index}`} 
-                        fill={entry.isOthers ? othersColor : colors[index % colors.length]} 
+                        fill={entry.isOthers ? othersColor : 
+                            entry.isInTop80 ? colors[index % colors.length] : 
+                            '#d1d5db'} 
                             />
                     ))}
                 </Bar>
                     </BarChart>
                     </ResponsiveContainer>
                     
-                    {/* Expense List */}
+                    {/* 80% Visual Indicator with Legend */}
+                    <div className="absolute top-2 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
+                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-red-500 rounded"></div>
+                    <span className="text-xs text-gray-700">Top {Math.floor(top80Percentage)}%</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                    <span className="text-xs text-gray-700">Remaining 25%</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-gray-500 rounded"></div>
+                    <span className="text-xs text-gray-700">Others</span>
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+                    
                     <div className="mt-6 border-t pt-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Expense Details</h3>
                     <div className="space-y-2">
-                    {processedExpenses.map((expense: ExpenseData, index: number) => (
+                    {expensesWithCumulative.map((expense: any, index: number) => (
                         <div key={index} className="flex justify-between items-center py-2 px-3 hover:bg-gray-50 rounded">
                             <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded ${
+expense.isOthers ? 'bg-gray-500' :
+expense.isInTop80 ? 'bg-red-500' : 'bg-gray-300'
+}`}></div>
                             <span className={`text-sm font-medium ${expense.isOthers ? 'text-gray-600' : 'text-gray-700'}`}>
                             {index + 1}. {expense.account}
                         </span>
@@ -148,6 +198,11 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
                                     Combined
                                 </span>
                             )}
+                        {!expense.isOthers && expense.isInTop80 && (
+                            <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                                Top 80%
+                                </span>
+                        )}
                         </div>
                             <span className={`font-mono font-medium ${expense.isOthers ? 'text-gray-600' : 'text-red-600'}`}>
                             {formatCurrency(expense.amount)}

@@ -17,7 +17,7 @@ function App() {
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [currentPeriod, setCurrentPeriod] = useState('');
     const [showExpenseChart, setShowExpenseChart] = useState(false);
-    const [maxExpenseItems, setMaxExpenseItems] = useState(10);
+    const [maxExpenseItems, setMaxExpenseItems] = useState(25);
     
     // Controls state
     const [currentCommand, setCurrentCommand] = useState('bal');
