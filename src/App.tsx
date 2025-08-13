@@ -4,8 +4,8 @@ import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, Transac
 import { AccountTree } from './components/AccountTree';
 import { BalanceSummary } from './components/BalanceSummary';
 import { Controls } from './components/Controls';
-import { ExpenseChart } from './components/ExpenseChart';
-import { ExpensePieChart } from './components/ExpensePieChart';
+import ExpenseChart from './components/ExpenseChart';
+import ExpensePieChart from './components/ExpensePieChart';
 import CashFlowView from './components/CashFlowView';
 import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown } from 'lucide-react';
 
@@ -17,6 +17,7 @@ function App() {
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [currentPeriod, setCurrentPeriod] = useState('');
     const [showExpenseChart, setShowExpenseChart] = useState(false);
+    const [maxExpenseItems, setMaxExpenseItems] = useState(10);
     
     // Controls state
     const [currentCommand, setCurrentCommand] = useState('bal');
@@ -127,34 +128,46 @@ function App() {
         setTransactionData(null);
     };
 
-    const getTop10Expenses = () => {
+    const getAllExpenses = () => {
         if (!data || !data.accounts) return [];
         
-        // Type assertion to any to work with the actual data structure
         const accountsWithBalance = data.accounts as any[];
         
-        // Parse the balance to get numeric value
         const parseBalance = (account: any): number => {
-            if (account.amount && typeof account.amount === 'number') {
-                return account.amount;
-            }
+            // Try different possible field names for the balance/amount
+            const possibleFields = ['amount', 'balance', 'value'];
             
+            for (const field of possibleFields) {
+                if (account[field] !== undefined) {
+                    if (typeof account[field] === 'number') {
+                        return Math.abs(account[field]);
+                    }
+                    if (typeof account[field] === 'string') {
+                        const cleanValue = account[field].replace(/[^\d.,-]/g, '').replace(',', '.');
+                        const parsed = parseFloat(cleanValue) || 0;
+                        return Math.abs(parsed);
+                    }
+                }
+            }
             return 0;
         };
         
-        // Filter only accounts where fullPath starts with "Despesas:" and have negative balances
+        // Get ALL expenses, sorted by amount (largest first)
         const expenses = accountsWithBalance
-            .filter(account => account.fullPath && account.fullPath.startsWith('Despesas:'))
+            .filter(account => {
+                const isExpenseAccount = account.fullPath && 
+                    (account.fullPath.startsWith('Despesas:') || 
+                        account.fullPath.startsWith('Expenses:') ||
+                        account.fullPath.toLowerCase().includes('expense'));
+                
+                const amount = parseBalance(account);
+                return isExpenseAccount && amount > 0;
+            })
             .map(account => ({
-                account: account.account || account.name || 'Unknown',
+                account: account.account || account.name || account.fullPath?.split(':').pop() || 'Unknown',
                 amount: parseBalance(account)
             }))
-            .sort((a, b) => b.amount - a.amount) // Sort ascending (most negative first)
-            .slice(0, 10)
-            .map(item => ({
-                account: item.account,
-                amount: Math.abs(item.amount)
-            }));
+            .sort((a, b) => b.amount - a.amount); // Sort by largest first
         
         return expenses;
     };
@@ -221,9 +234,9 @@ function App() {
         currentPeriod={currentPeriod}
             />
             
-            {/* Expense Chart Toggle Button */}
+            {/* Expense Chart Toggle Button and Controls */}
         {data && !selectedAccount && !transactionData && (
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex flex-col items-center space-y-3">
                 <button
             onClick={toggleExpenseChart}
             className={`flex items-center space-x-2 px-6 py-2 rounded-md transition-colors ${
@@ -233,11 +246,36 @@ showExpenseChart
 }`}
                 >
                 <TrendingDown className="h-5 w-5" />
-                <span>{showExpenseChart ? 'Show Account Balances' : 'Show Top 10 Expenses'}</span>
+                <span>{showExpenseChart ? 'Show Account Balances' : 'Show Top Expenses'}</span>
                 </button>
                 </div>
         )}
         </div>
+               
+                {/* Expense Count Control - only show when expense charts are visible */}
+            {showExpenseChart && (
+                <div className="flex items-center space-x-4 bg-gray-50 px-4 py-2 rounded-lg">
+                    <label className="text-sm font-medium text-gray-700">
+                    Show top:
+                </label>
+                    <select
+                value={maxExpenseItems}
+                onChange={(e) => setMaxExpenseItems(parseInt(e.target.value))}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                    <option value={3}>3 expenses</option>
+                    <option value={5}>5 expenses</option>
+                    <option value={7}>7 expenses</option>
+                    <option value={10}>10 expenses</option>
+                    <option value={15}>15 expenses</option>
+                    <option value={25}>25 expenses</option>
+                    <option value={50}>50 expenses</option>
+                    </select>
+                    <span className="text-xs text-gray-500">
+                    (+ others combined)
+                </span>
+                    </div>
+            )}
 
             {/* Error Message */}
         {error && (
@@ -264,17 +302,19 @@ showExpenseChart
         {data && !isLoading && (
             <>
                 {/* Show Expense Charts or Normal View */}
-            {showExpenseChart && !selectedAccount && !transactionData ? (
-                <div className="space-y-6">
-                    <ExpensePieChart 
-                expenses={getTop10Expenses()} 
-                currency={data.currency} 
-                    />
-                    <ExpenseChart 
-                expenses={getTop10Expenses()} 
-                currency={data.currency} 
-                    />
-                    </div>
+{showExpenseChart && !selectedAccount && !transactionData ? (
+    <div className="space-y-6">
+        <ExpensePieChart 
+            expenses={getAllExpenses()} 
+            currency={data.currency} 
+            maxItems={maxExpenseItems}
+        />
+        <ExpenseChart 
+            expenses={getAllExpenses()} 
+            currency={data.currency} 
+            maxItems={maxExpenseItems}
+        />
+    </div>
             ) : (
                 <>
                     {/* Balance Summary */}
