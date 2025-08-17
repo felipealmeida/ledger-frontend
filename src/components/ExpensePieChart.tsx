@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { TrendingDown } from 'lucide-react';
 
 interface ExpenseData {
@@ -11,7 +11,7 @@ interface ExpenseData {
 interface ExpensePieChartProps {
     expenses: ExpenseData[];
     currency: string;
-    maxItems?: number;
+    maxItems?: number; // How many items to show (last slot becomes "Others" if needed)
 }
 
 export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
@@ -40,13 +40,15 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
             currency: currency || 'BRL',
         }).format(Math.abs(value));
 
-    // 1) Process expenses into "top N + Others"
+    // Process expenses to create "top N-1 + Others"
     const processedExpenses = React.useMemo<ExpenseData[]>(() => {
-        if (expenses.length <= maxItems) return expenses;
+        if (expenses.length <= maxItems) {
+            return expenses;
+        }
 
         const topExpenses = expenses.slice(0, maxItems - 1);
         const remainingExpenses = expenses.slice(maxItems - 1);
-        const othersSum = remainingExpenses.reduce((sum, e) => sum + e.amount, 0);
+        const othersSum = remainingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
 
         const othersCategory: ExpenseData = {
             account: `Others (${remainingExpenses.length} accounts)`,
@@ -57,7 +59,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         return [...topExpenses, othersCategory];
     }, [expenses, maxItems]);
 
-    // 2) Build a stable color map so colors don't shift when filtering
+    // Stable color map so colors don't jump when filtering
     const colorMap = React.useMemo(() => {
         const map = new Map<string, string>();
         processedExpenses.forEach((e, idx) => {
@@ -66,9 +68,8 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         return map;
     }, [processedExpenses]);
 
-    // 3) Hidden accounts state + togglers
+    // Hidden accounts toggle
     const [hidden, setHidden] = React.useState<Set<string>>(new Set());
-
     const toggleAccount = (account: string) => {
         setHidden((prev) => {
             const next = new Set(prev);
@@ -77,16 +78,14 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
             return next;
         });
     };
-
     const resetFilters = () => setHidden(new Set());
 
-    // 4) Visible data = processedExpenses - hidden
+    // Only visible items are included in the pie and percentage accounting
     const visibleExpenses = React.useMemo(
         () => processedExpenses.filter((e) => !hidden.has(e.account)),
         [processedExpenses, hidden]
     );
 
-    // 5) Totals/percentages based only on visible items
     const totalVisible = visibleExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     const dataWithPercentage = visibleExpenses.map((e) => ({
@@ -94,7 +93,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         percentage: totalVisible > 0 ? ((e.amount / totalVisible) * 100).toFixed(1) : '0.0',
     }));
 
-    // 6) Tooltip & label
+    // Tooltip & label for the pie
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload[0]) {
             const d = payload[0].payload;
@@ -120,7 +119,9 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
         if (parseFloat(percentage) < 5) return null; // Hide labels for tiny slices
+
         return (
             <text
             x={x}
@@ -149,7 +150,9 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
             </div>
             <div className="flex items-center space-x-3 text-sm text-gray-500">
             {expenses.length > maxItems && (
-                <span>Showing {maxItems} of {expenses.length} accounts</span>
+                <span>
+                    Showing {maxItems} of {expenses.length} accounts
+                </span>
             )}
         {hidden.size > 0 && (
             <button
@@ -184,13 +187,12 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
                 label={renderCustomizedLabel}
                 outerRadius={150}
                 dataKey="amount"
-                // Allow clicking *any* slice to toggle its account
                 onClick={(_, index) => {
                     const d = dataWithPercentage[index];
                     if (d) toggleAccount(d.account);
                 }}
                     >
-                    {dataWithPercentage.map((entry, index) => (
+                    {dataWithPercentage.map((entry) => (
                         <Cell
                         key={`cell-${entry.account}`}
                         fill={colorMap.get(entry.account) || '#999'}
@@ -203,32 +205,38 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
                     </ResponsiveContainer>
                     </div>
 
-                    {/* Legend / List (clickable to toggle) */}
+                    {/* Legend / List (shows all items; hidden items display real amount and no %) */}
                     <div className="flex flex-col justify-center">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Expense Breakdown</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {processedExpenses.map((expense, idx) => {
+                    {processedExpenses.map((expense) => {
                         const isHidden = hidden.has(expense.account);
                         const color = colorMap.get(expense.account) || '#999';
-                        const visible = !isHidden;
-                        // Find current visible percentage/amount if not hidden
+
+                        // Find visible recomputed entry (if not hidden)
                         const current = dataWithPercentage.find((d) => d.account === expense.account);
+
+                        // Amount: show real original when hidden; recomputed when visible
+                        const displayAmount = isHidden ? expense.amount : (current?.amount ?? expense.amount);
+
+                        // Percentage: exclude hidden from accounting
+                        const displayPct = isHidden ? '—' : (current ? `${current.percentage}%` : '—');
 
                         return (
                             <button
                             key={expense.account}
                             onClick={() => toggleAccount(expense.account)}
-                            className={`w-full flex items-center justify-between py-2 px-3 rounded transition
-${isHidden ? 'opacity-50' : 'hover:bg-gray-50'}
-`}
+                            className={`w-full flex items-center justify-between py-2 px-3 rounded transition ${
+isHidden ? 'opacity-60' : 'hover:bg-gray-50'
+}`}
                             title={isHidden ? 'Click to show' : 'Click to hide'}
                             role="switch"
-                            aria-checked={visible}
+                            aria-checked={!isHidden}
                                 >
                                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                                 <span
                             className="w-4 h-4 rounded flex-shrink-0"
-                            style={{ backgroundColor: color, opacity: isHidden ? 0.35 : 1 }}
+                            style={{ backgroundColor: color, opacity: isHidden ? 0.5 : 1 }}
                                 />
                                 <span
                             className={`text-sm font-medium truncate ${
@@ -244,15 +252,13 @@ expense.isOthers ? 'text-gray-600' : 'text-gray-700'
                                 )}
                             </div>
                                 <div className="flex items-center space-x-3 ml-3">
-                                <span className="text-sm text-gray-500">
-                                {current ? `${current.percentage}%` : '--'}
-                            </span>
+                                <span className="text-sm text-gray-500">{displayPct}</span>
                                 <span
                             className={`font-mono font-medium text-sm ${
 expense.isOthers ? 'text-gray-600' : 'text-red-600'
 }`}
                                 >
-                                {current ? formatCurrency(current.amount) : formatCurrency(0)}
+                                {formatCurrency(displayAmount)}
                             </span>
                                 </div>
                                 </button>
@@ -263,9 +269,7 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
                     {/* Total (visible only) */}
                     <div className="mt-4 pt-4 border-t">
                     <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-700">
-                    Total (visible) Expenses
-                </span>
+                    <span className="font-semibold text-gray-700">Total (visible) Expenses</span>
                     <span className="font-mono text-red-600 font-bold text-lg">
                     {formatCurrency(totalVisible)}
                 </span>
@@ -280,8 +284,8 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
                     {/* Note about Others category */}
                 {expenses.length > maxItems && (
                     <div className="mt-4 p-3 bg-gray-50 rounded text-sm text-gray-600">
-                        <strong>Note:</strong> The "Others" category combines {expenses.length - maxItems + 1} expense
-                    accounts that weren&apos;t shown individually.
+                        <strong>Note:</strong> The "Others" category combines {expenses.length - maxItems + 1}{' '}
+                    expense accounts that weren&apos;t shown individually.
                         </div>
                 )}
                 </div>
@@ -297,11 +301,7 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
         {nothingVisible && (
             <div className="mt-6 text-center text-sm text-gray-500">
                 All categories are hidden.{' '}
-                <button
-            onClick={resetFilters}
-            className="underline hover:no-underline"
-            title="Show all again"
-                >
+                <button onClick={resetFilters} className="underline hover:no-underline" title="Show all again">
                 Reset filters
             </button>
                 </div>
