@@ -11,13 +11,13 @@ interface ExpenseData {
 interface ExpensePieChartProps {
     expenses: ExpenseData[];
     currency: string;
-    maxItems?: number; // New prop to control how many items to show
+    maxItems?: number;
 }
 
-export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({ 
-    expenses, 
-    currency, 
-    maxItems = 10 
+export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
+    expenses,
+    currency,
+    maxItems = 10,
 }) => {
     // Colors for the pie slices - red/orange gradient with a special color for "Others"
     const COLORS = [
@@ -34,59 +34,79 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
     ];
     const othersColor = '#6b7280'; // Gray color for "Others" category
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
+    const formatCurrency = (value: number) =>
+        new Intl.NumberFormat('pt-BR', {
             style: 'currency',
-            currency: currency || 'BRL'
+            currency: currency || 'BRL',
         }).format(Math.abs(value));
-    };
 
-    // Process expenses to create the chart data
-    const processedExpenses = React.useMemo((): ExpenseData[] => {
-        if (expenses.length <= maxItems) {
-            return expenses;
-        }
+    // 1) Process expenses into "top N + Others"
+    const processedExpenses = React.useMemo<ExpenseData[]>(() => {
+        if (expenses.length <= maxItems) return expenses;
 
-        // Take the top (maxItems - 1) expenses
         const topExpenses = expenses.slice(0, maxItems - 1);
-        
-        // Sum the remaining expenses
         const remainingExpenses = expenses.slice(maxItems - 1);
-        const othersSum = remainingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-        
-        // Add "Others" category
+        const othersSum = remainingExpenses.reduce((sum, e) => sum + e.amount, 0);
+
         const othersCategory: ExpenseData = {
             account: `Others (${remainingExpenses.length} accounts)`,
             amount: othersSum,
-            isOthers: true
+            isOthers: true,
         };
 
         return [...topExpenses, othersCategory];
     }, [expenses, maxItems]);
 
-    // Calculate total for percentage
-    const total = processedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    // 2) Build a stable color map so colors don't shift when filtering
+    const colorMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        processedExpenses.forEach((e, idx) => {
+            map.set(e.account, e.isOthers ? othersColor : COLORS[idx % COLORS.length]);
+        });
+        return map;
+    }, [processedExpenses]);
 
-    // Prepare data with percentages
-    const dataWithPercentage = processedExpenses.map((expense: ExpenseData) => ({
-        ...expense,
-        percentage: ((expense.amount / total) * 100).toFixed(1)
+    // 3) Hidden accounts state + togglers
+    const [hidden, setHidden] = React.useState<Set<string>>(new Set());
+
+    const toggleAccount = (account: string) => {
+        setHidden((prev) => {
+            const next = new Set(prev);
+            if (next.has(account)) next.delete(account);
+            else next.add(account);
+            return next;
+        });
+    };
+
+    const resetFilters = () => setHidden(new Set());
+
+    // 4) Visible data = processedExpenses - hidden
+    const visibleExpenses = React.useMemo(
+        () => processedExpenses.filter((e) => !hidden.has(e.account)),
+        [processedExpenses, hidden]
+    );
+
+    // 5) Totals/percentages based only on visible items
+    const totalVisible = visibleExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const dataWithPercentage = visibleExpenses.map((e) => ({
+        ...e,
+        percentage: totalVisible > 0 ? ((e.amount / totalVisible) * 100).toFixed(1) : '0.0',
     }));
 
+    // 6) Tooltip & label
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload[0]) {
-            const data = payload[0].payload;
+            const d = payload[0].payload;
             return (
                 <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
-                    <p className="font-semibold text-gray-800">{data.account}</p>
-                    <p className={`font-mono ${data.isOthers ? 'text-gray-600' : 'text-red-600'}`}>
-                    {formatCurrency(data.amount)}
+                    <p className="font-semibold text-gray-800">{d.account}</p>
+                    <p className={`font-mono ${d.isOthers ? 'text-gray-600' : 'text-red-600'}`}>
+                    {formatCurrency(d.amount)}
                 </p>
-                    <p className="text-sm text-gray-600">{data.percentage}% of total</p>
-                    {data.isOthers && (
-                        <p className="text-xs text-gray-500 mt-1">
-                            Combined total of remaining expenses
-                        </p>
+                    <p className="text-sm text-gray-600">{d.percentage}% of visible total</p>
+                    {d.isOthers && (
+                        <p className="text-xs text-gray-500 mt-1">Combined total of remaining expenses</p>
                     )}
                 </div>
             );
@@ -100,22 +120,22 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-        if (parseFloat(percentage) < 5) return null; // Don't show label for small slices
-
+        if (parseFloat(percentage) < 5) return null; // Hide labels for tiny slices
         return (
-            <text 
-            x={x} 
-            y={y} 
-            fill="white" 
-            textAnchor={x > cx ? 'start' : 'end'} 
+            <text
+            x={x}
+            y={y}
+            fill="white"
+            textAnchor={x > cx ? 'start' : 'end'}
             dominantBaseline="central"
-            className="font-semibold text-sm"
+            className="font-semibold text-sm select-none"
                 >
                 {`${percentage}%`}
             </text>
         );
     };
+
+    const nothingVisible = dataWithPercentage.length === 0;
 
     return (
         <div className="bg-white rounded-lg shadow-md">
@@ -127,20 +147,28 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
             Top {Math.min(maxItems, expenses.length)} Expenses Distribution
         </h2>
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="flex items-center space-x-3 text-sm text-gray-500">
             {expenses.length > maxItems && (
                 <span>Showing {maxItems} of {expenses.length} accounts</span>
             )}
+        {hidden.size > 0 && (
+            <button
+            onClick={resetFilters}
+            className="ml-2 rounded px-2 py-1 border border-gray-300 text-gray-700 hover:bg-gray-50"
+            title="Show all again"
+                >
+                Reset filters
+            </button>
+        )}
         </div>
             </div>
             <p className="text-sm text-gray-600 mt-1">
-            {expenses.length > maxItems 
+            {expenses.length > maxItems
                 ? `Showing expense distribution for top ${maxItems - 1} accounts plus others combined`
-                : 'Showing expense distribution by percentage'
-            }
+                : 'Showing expense distribution by percentage'}
         </p>
             </div>
-            
+
             <div className="p-6">
             {processedExpenses.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -155,79 +183,105 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
                 labelLine={false}
                 label={renderCustomizedLabel}
                 outerRadius={150}
-                fill="#8884d8"
                 dataKey="amount"
+                // Allow clicking *any* slice to toggle its account
+                onClick={(_, index) => {
+                    const d = dataWithPercentage[index];
+                    if (d) toggleAccount(d.account);
+                }}
                     >
                     {dataWithPercentage.map((entry, index) => (
-                        <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.isOthers ? othersColor : COLORS[index % COLORS.length]} 
+                        <Cell
+                        key={`cell-${entry.account}`}
+                        fill={colorMap.get(entry.account) || '#999'}
+                        style={{ cursor: 'pointer' }}
                             />
                     ))}
                 </Pie>
                     <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
+                </PieChart>
                     </ResponsiveContainer>
                     </div>
 
-                    {/* Legend / List */}
+                    {/* Legend / List (clickable to toggle) */}
                     <div className="flex flex-col justify-center">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Expense Breakdown</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {dataWithPercentage.map((expense, index) => (
-                        <div 
-                        key={index} 
-                        className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded"
-                            >
-                            <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            <div 
-                        className="w-4 h-4 rounded flex-shrink-0" 
-                        style={{ 
-                            backgroundColor: expense.isOthers 
-                                ? othersColor 
-                                : COLORS[index % COLORS.length] 
-                        }}
-                            />
-                            <span className={`text-sm font-medium truncate ${
+                    {processedExpenses.map((expense, idx) => {
+                        const isHidden = hidden.has(expense.account);
+                        const color = colorMap.get(expense.account) || '#999';
+                        const visible = !isHidden;
+                        // Find current visible percentage/amount if not hidden
+                        const current = dataWithPercentage.find((d) => d.account === expense.account);
+
+                        return (
+                            <button
+                            key={expense.account}
+                            onClick={() => toggleAccount(expense.account)}
+                            className={`w-full flex items-center justify-between py-2 px-3 rounded transition
+${isHidden ? 'opacity-50' : 'hover:bg-gray-50'}
+`}
+                            title={isHidden ? 'Click to show' : 'Click to hide'}
+                            role="switch"
+                            aria-checked={visible}
+                                >
+                                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                <span
+                            className="w-4 h-4 rounded flex-shrink-0"
+                            style={{ backgroundColor: color, opacity: isHidden ? 0.35 : 1 }}
+                                />
+                                <span
+                            className={`text-sm font-medium truncate ${
 expense.isOthers ? 'text-gray-600' : 'text-gray-700'
-}`}>
-                            {expense.account}
-                        </span>
-                            {expense.isOthers && (
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                                    Combined
-                                </span>
-                            )}
-                        </div>
-                            <div className="flex items-center space-x-3 ml-3">
-                            <span className="text-sm text-gray-500">
-                            {expense.percentage}%
+}`}
+                                >
+                                {expense.account}
                             </span>
-                            <span className={`font-mono font-medium text-sm ${
+                                {expense.isOthers && (
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                        Combined
+                                    </span>
+                                )}
+                            </div>
+                                <div className="flex items-center space-x-3 ml-3">
+                                <span className="text-sm text-gray-500">
+                                {current ? `${current.percentage}%` : '--'}
+                            </span>
+                                <span
+                            className={`font-mono font-medium text-sm ${
 expense.isOthers ? 'text-gray-600' : 'text-red-600'
-}`}>
-                            {formatCurrency(expense.amount)}
-                        </span>
-                            </div>
-                            </div>
-                    ))}
+}`}
+                                >
+                                {current ? formatCurrency(current.amount) : formatCurrency(0)}
+                            </span>
+                                </div>
+                                </button>
+                        );
+                    })}
                 </div>
-                    
-                    {/* Total */}
+
+                    {/* Total (visible only) */}
                     <div className="mt-4 pt-4 border-t">
                     <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-700">Total Expenses</span>
+                    <span className="font-semibold text-gray-700">
+                    Total (visible) Expenses
+                </span>
                     <span className="font-mono text-red-600 font-bold text-lg">
-                    {formatCurrency(total)}
+                    {formatCurrency(totalVisible)}
                 </span>
                     </div>
-                    </div>
+                    {hidden.size > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            {hidden.size} account{hidden.size > 1 ? 's' : ''} hidden
+                        </p>
+                    )}
+                </div>
 
                     {/* Note about Others category */}
                 {expenses.length > maxItems && (
                     <div className="mt-4 p-3 bg-gray-50 rounded text-sm text-gray-600">
-                        <strong>Note:</strong> The "Others" category combines {expenses.length - maxItems + 1} expense accounts 
-                    that weren\'t shown individually.
+                        <strong>Note:</strong> The "Others" category combines {expenses.length - maxItems + 1} expense
+                    accounts that weren&apos;t shown individually.
                         </div>
                 )}
                 </div>
@@ -238,6 +292,20 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
                     <p>No expense data available</p>
                     </div>
             )}
+
+        {/* If everything is hidden, a gentle hint */}
+        {nothingVisible && (
+            <div className="mt-6 text-center text-sm text-gray-500">
+                All categories are hidden.{' '}
+                <button
+            onClick={resetFilters}
+            className="underline hover:no-underline"
+            title="Show all again"
+                >
+                Reset filters
+            </button>
+                </div>
+        )}
         </div>
             </div>
     );

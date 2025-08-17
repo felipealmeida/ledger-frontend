@@ -20,8 +20,11 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({
     maxItems = 10 
 }) => {
     const colors = [
-        '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca',
-        '#fee2e2', '#fef2f2', '#fffbfb', '#ffffff', '#ffffff'
+        '#7f1d1d', '#8b1f1f', '#971f1f', '#a32222', '#af2323',
+        '#bb2525', '#c72929', '#d32d2d', '#df3232', '#eb3838',
+        '#f64242', '#f85151', '#fa6060', '#fc6f6f', '#fe7e7e',
+        '#ff8d8d', '#ff9c9c', '#ffabab', '#ffbaba', '#ffc9c9',
+        '#ffd8d8', '#ffe7e7', '#fff0f0', '#fff7f7', '#ffffff'
     ];
     const othersColor = '#6b7280';
 
