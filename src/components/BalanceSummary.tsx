@@ -40,10 +40,10 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts, curren
     
     // Note: expenses are already positive in ledger, liabilities are negative
     return { 
-      assets: Math.abs(assets), 
-      liabilities: Math.abs(liabilities), 
+      assets: assets, 
+      liabilities: liabilities, 
       income: income,
-      expenses: Math.abs(expenses),
+      expenses: expenses,
     };
   };
 
