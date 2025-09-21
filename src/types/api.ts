@@ -52,3 +52,26 @@ export interface LedgerSubTotalsResponse {
     account: string;
     timestamp: string;
 }
+
+export interface BudgetItem {
+    account: string;
+    fullPath: string;
+    actualAmount: number;
+    budgetAmount: number;
+    variance: number;
+    variancePercentage: number;
+    formattedActual: string;
+    formattedBudget: string;
+    formattedVariance: string;
+    isOverBudget: boolean;
+}
+
+export interface BudgetResponse {
+    budgetItems: BudgetItem[];
+    totalActual: number;
+    totalBudget: number;
+    totalVariance: number;
+    period: string;
+    timestamp: string;
+}
+

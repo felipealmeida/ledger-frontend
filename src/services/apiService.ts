@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse } from '../types/api';
+import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, BudgetResponse } from '../types/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -76,5 +76,27 @@ export class LedgerApiService {
         
         const response = await axios.get(`${API_BASE_URL}/api/cash-flow/${encodeURIComponent(account)}?${params}`);
         return response.data;
+    }
+
+
+    static async getBudgetReport(period?: string): Promise<BudgetResponse> {
+        try {
+            const params = new URLSearchParams();
+            if (period) {
+                params.append('period', period);
+            }
+            
+            const url = `${API_BASE_URL}/api/budget${params.toString() ? `?${params.toString()}` : ''}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Failed to fetch budget report:', error);
+            throw error;
+        }
     }
 }
