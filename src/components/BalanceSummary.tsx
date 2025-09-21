@@ -24,7 +24,7 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts, curren
       })
       .reduce((sum, acc) => sum + acc.amount, 0);
     
-    const liabilities = accounts
+    const liabilities = -accounts
       .filter(acc => {
         const path = (acc.fullPath || acc.account).toLowerCase();
         return path.startsWith('passivo');
