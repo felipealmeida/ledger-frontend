@@ -532,13 +532,13 @@ showExpenseDiff
                 currency={data?.currency ?? 'BRL'}
                 maxItems={maxExpenseItems}
                     />
-                    {/*
+                    {
                     <ExpenseChart
-                expenses={getAllExpenses()}
+                expenses={getAllExpenses(data)}
                 currency={data?.currency ?? 'BRL'}
                 maxItems={maxExpenseItems}
                     />
-                     */}
+                     }
                     </div>
             ) : (
                 <>
