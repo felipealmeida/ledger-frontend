@@ -7,12 +7,13 @@ export interface LedgerAccount {
   account: string;
   fullPath: string;
   amounts: AmountsMap;
+  clearedAmounts: AmountsMap;
   lastClearedDate?: string | null;
   children?: LedgerAccount[];
   currency?: string;
 }
 
-export type AccWithBig = LedgerAccount & { amountsBigInt?: Record<string, Decimal> };
+export type AccWithBig = LedgerAccount & { amountsBigInt?: Record<string, Decimal>, clearedAmountsBigInt?: Record<string, Decimal> };
 
 export interface LedgerBalanceResponse {
   account: LedgerAccount;
@@ -22,11 +23,17 @@ export interface LedgerBalanceResponse {
 
 function attachBigInts(
   account: LedgerAccount
-): LedgerAccount & { amountsBigInt: BigAmountsMap } {
+): LedgerAccount & { amountsBigInt: BigAmountsMap, clearedAmountsBigInt: Record<string, Decimal> } {
   return {
     ...account,
     amountsBigInt: Object.fromEntries(
       Object.entries(account.amounts).map(([currency, value]) => [
+        currency,
+        new Decimal(value),
+      ])
+    ),
+    clearedAmountsBigInt: Object.fromEntries(
+      Object.entries(account.clearedAmounts).map(([currency, value]) => [
         currency,
         new Decimal(value),
       ])
