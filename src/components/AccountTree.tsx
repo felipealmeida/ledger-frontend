@@ -31,17 +31,23 @@ function assertHasBig(
 const getAmountSign = (d: Decimal) =>
     d.isZero() ? 'zero' : d.isPositive() ? 'positive' : 'negative';
 
+/** Return non-zero amounts sorted by |value| desc (bigger → smaller). Tie-breaker: currency ASC */
 const getNonZeroAmounts = (acc: AccWithBig) => {
     assertHasBig(acc); // narrow here (or at call site)
     return Object.entries(acc.amountsBigInt)
         .filter(([_, d]) => !d.isZero())
-        .map(([currency, value]) => ({ currency, value }));
+        .map(([currency, value]) => ({ currency, value }))
+        .sort((a, b) => {
+            const av = a.value.abs();
+            const bv = b.value.abs();
+            if (bv.gt(av)) return 1;
+            if (bv.lt(av)) return -1;
+            return a.currency.localeCompare(b.currency);
+        });
 };
+
 const norm = (s: string) =>
-    s
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .toLowerCase();
+    s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 const AccountNode: React.FC<AccountNodeProps> = ({
     account,
@@ -59,6 +65,8 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     const accountPath = account.fullPath || account.account;
     const hasChildren = !!account.children?.length;
     const isSelected = selectedAccount === accountPath;
+
+    // already sorted by |amount| desc
     const amounts = getNonZeroAmounts(account);
 
     const handleClick = (e: React.MouseEvent) => {
