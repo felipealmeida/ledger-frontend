@@ -561,7 +561,7 @@ showExpenseDiff
                     <div className="p-6">
                     {data.account.children && data.account.children.length > 0 ? (
                         <AccountTree
-                        accounts={data.account.children}
+                        accounts={data.account.children || []}
                         onAccountSelect={handleAccountSearch}
                         selectedAccount={selectedAccount}
                             />

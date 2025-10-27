@@ -1,18 +1,45 @@
+import Decimal from 'decimal.js';
+
 export type AmountsMap = Record<string, string>;
+export type BigAmountsMap = Record<string, Decimal>;
 
 export interface LedgerAccount {
-    account: string;
-    fullPath: string;
-    amounts: AmountsMap;
-    lastClearedDate?: string | null;
-    children?: LedgerAccount[];
-    currency?: string;
+  account: string;
+  fullPath: string;
+  amounts: AmountsMap;
+  lastClearedDate?: string | null;
+  children?: LedgerAccount[];
+  currency?: string;
 }
 
 export interface LedgerBalanceResponse {
-    account: LedgerAccount;
-    timestamp: string;
-    currency?: string;
+  account: LedgerAccount;
+  timestamp: string;
+  currency?: string;
+}
+
+function attachBigInts(
+  account: LedgerAccount
+): LedgerAccount & { amountsBigInt: BigAmountsMap } {
+  return {
+    ...account,
+    amountsBigInt: Object.fromEntries(
+      Object.entries(account.amounts).map(([currency, value]) => [
+        currency,
+        new Decimal(value),
+      ])
+    ),
+    children: account.children?.map(attachBigInts),
+  };
+}
+
+export function withBigInts(
+  res: LedgerBalanceResponse
+): LedgerBalanceResponse & { account: ReturnType<typeof attachBigInts> } {
+  return {
+    ...res,
+    account: attachBigInts(res.account),
+  };
 }
 
 export interface HealthResponse {

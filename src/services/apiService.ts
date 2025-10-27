@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, BudgetResponse } from '../types/api';
+import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, BudgetResponse, withBigInts } from '../types/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -30,7 +30,7 @@ export class LedgerApiService {
         const response = await api.get<LedgerBalanceResponse>(
             `/api/balance${params.toString() ? `?${params.toString()}` : ''}`
         );
-        return response.data;
+        return withBigInts(response.data);
     }
 
     /**
