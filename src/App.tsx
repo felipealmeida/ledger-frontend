@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { LedgerApiService } from './services/apiService';
 import {
+    LedgerAccount,
     LedgerBalanceResponse,
     LedgerSubTotalsResponse,
     HealthResponse,
     TransactionData,
     BudgetResponse,
+    AccWithBig,
 } from './types/api';
 import { AccountTree } from './components/AccountTree';
 import { BalanceSummary } from './components/BalanceSummary';
@@ -16,6 +18,9 @@ import ExpenseDiffChart from './components/ExpenseDiffChart';
 import CashFlowView from './components/CashFlowView';
 import BudgetVisualization from './components/BudgetVisualization';
 import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown, Target } from 'lucide-react';
+import Decimal from 'decimal.js';
+
+type PieExpense = { account: string; amount: Decimal };
 
 function App() {
     const [data, setData] = useState<LedgerBalanceResponse | null>(null);
@@ -195,56 +200,59 @@ function App() {
         setTransactionData(null);
     };
 
-    // Helper function to parse amount from the new format
-    const parseAmount = (amounts: Record<string, string>, currency: string = 'BRL'): number => {
-        if (!amounts || typeof amounts !== 'object') return 0;
-        
-        const amountStr = amounts[currency] || amounts[currency.toLowerCase()] || '0';
-        // Remove formatting: "693928,00" -> 693928.00
-        const cleanValue = amountStr.toString().replace(/\./g, '').replace(',', '.');
-        return parseFloat(cleanValue) || 0;
-    };
-
-    // Recursive function to extract all expense accounts
-    const extractExpensesRecursive = (accounts: any[], currency: string = 'BRL'): { account: string; amount: number }[] => {
-        let expenses: { account: string; amount: number }[] = [];
-        
-        for (const account of accounts) {
-            const isExpenseAccount =
-                account.fullPath &&
-                (account.fullPath.startsWith('Despesas:') ||
-                    account.fullPath.startsWith('Expenses:') ||
-                    account.fullPath.toLowerCase().includes('expense'));
-            
-            const amount = Math.abs(parseAmount(account.amounts, currency));
-            
-            if (isExpenseAccount && amount > 0) {
-                expenses.push({
-                    account: account.account || account.fullPath?.split(':').pop() || 'Unknown',
-                    amount: amount,
-                });
-            }
-            
-            // Recursively process children
-            if (account.children && account.children.length > 0) {
-                expenses = expenses.concat(extractExpensesRecursive(account.children, currency));
-            }
+    /** Assertion function with explicit type annotation (TS2775-friendly) */
+    const assertHasBig: (acc: AccWithBig) => asserts acc is LedgerAccount & {
+        amountsBigInt: Record<string, Decimal>;
+    } = (acc) => {
+        if (!acc.amountsBigInt) {
+            throw new Error('amountsBigInt is missing. Ensure withBigInts() was applied before using this.');
         }
-        
-        return expenses;
     };
 
-    const extractExpensesFromBalance = (response: LedgerBalanceResponse | null) => {
-        if (!response || !response.account) return [];
+    const normalize = (s: string) =>
+        s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-        const accountsWithBalance = response.account.children || [];
+    const findExpensesRoot = (nodes: LedgerAccount[]) => {
+        const wanted = normalize('Despesas');
+        return nodes.find((a) => {
+            const first = normalize((a.fullPath || a.account).split(':')[0] || '');
+            return first === wanted;
+        });
+    };
+
+    const extractExpensesRecursive = (
+        node: LedgerAccount,
+        currency: string
+    ): PieExpense[] => {
+        assertHasBig(node);
+
+        const children = node.children ?? [];
+        if (children.length > 0) {
+            return children.flatMap((c) => extractExpensesRecursive(c, currency));
+        }
+
+        const d = node.amountsBigInt[currency];
+        if (!d || d.isZero()) return [];
+
+        return [{ account: node.account, amount: d.abs() }];
+    };
+
+    const extractExpensesFromBalance = (
+        response: LedgerBalanceResponse | null
+    ): PieExpense[] => {
+        if (!response?.account) return [];
+
         const currency = response.currency || 'BRL';
+        const roots = response.account.children || [];
+        const despesas = findExpensesRoot(roots);
+        if (!despesas) return [];
 
-        return extractExpensesRecursive(accountsWithBalance, currency)
-            .sort((a, b) => b.amount - a.amount);
+        const items = extractExpensesRecursive(despesas, currency);
+        return items.sort((a, b) => b.amount.comparedTo(a.amount));
     };
 
-    const getAllExpenses = () => extractExpensesFromBalance(data);
+    const getAllExpenses = (data: LedgerBalanceResponse | null) =>
+        extractExpensesFromBalance(data);
 
     const loadCompareData = async () => {
         if (!comparePeriodA || !comparePeriodB) {
@@ -273,8 +281,8 @@ function App() {
                 expenses: extractExpensesFromBalance(respB),
             };
 
-            setMonthAExpenses(a);
-            setMonthBExpenses(b);
+            //setMonthAExpenses(a);
+            //setMonthBExpenses(b);
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to load comparison data');
         } finally {
@@ -508,25 +516,29 @@ showExpenseDiff
                 {/* Single branch: Compare Months → Top Expenses → Normal view */}
             {showExpenseDiff && monthAExpenses && monthBExpenses ? (
                 <div className="space-y-6">
+                    {/*
                     <ExpenseDiffChart
                 currency={data?.currency ?? 'BRL'}
                 monthA={monthAExpenses}
                 monthB={monthBExpenses}
                 maxItems={maxDiffItems}
                     />
+                     */}
                     </div>
             ) : showExpenseChart && !selectedAccount && !transactionData ? (
                 <div className="space-y-6">
                     <ExpensePieChart
-                expenses={getAllExpenses()}
+                expenses={getAllExpenses(data)}
                 currency={data?.currency ?? 'BRL'}
                 maxItems={maxExpenseItems}
                     />
+                    {/*
                     <ExpenseChart
                 expenses={getAllExpenses()}
                 currency={data?.currency ?? 'BRL'}
                 maxItems={maxExpenseItems}
                     />
+                     */}
                     </div>
             ) : (
                 <>

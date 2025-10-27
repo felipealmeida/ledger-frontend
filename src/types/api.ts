@@ -12,6 +12,8 @@ export interface LedgerAccount {
   currency?: string;
 }
 
+export type AccWithBig = LedgerAccount & { amountsBigInt?: Record<string, Decimal> };
+
 export interface LedgerBalanceResponse {
   account: LedgerAccount;
   timestamp: string;

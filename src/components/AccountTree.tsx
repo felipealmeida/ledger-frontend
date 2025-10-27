@@ -1,9 +1,7 @@
 import React from 'react';
 import Decimal from 'decimal.js';
-import { LedgerAccount } from '../types/api';
+import { LedgerAccount, AccWithBig } from '../types/api';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-
-type AccWithBig = LedgerAccount & { amountsBigInt?: Record<string, Decimal> };
 
 interface AccountTreeProps {
     accounts: AccWithBig[]; // plural (you iterate a list)
@@ -29,11 +27,16 @@ function assertHasBig(
     }
 }
 
-const formatDecimalPtBR = (d: Decimal): string => {
-    const s = d.toFixed();
-    const [intPart, fracPart] = s.split('.');
-    const intBR = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return fracPart ? `${intBR},${fracPart}` : intBR;
+const getDecimalSeparator = (locale: string) =>
+  new Intl.NumberFormat(locale)
+    .formatToParts(1.1)
+    .find(p => p.type === 'decimal')?.value ?? '.';
+
+const formatDecimalSafe = (d: Decimal, locale = 'pt-BR'): string => {
+  const [intPart, fracPart] = d.toFixed().split('.');
+  const intFormatted = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(BigInt(intPart));
+  const sep = getDecimalSeparator(locale);
+  return fracPart ? `${intFormatted}${sep}${fracPart}` : intFormatted;
 };
 
 const getAmountSign = (d: Decimal) =>
@@ -133,7 +136,7 @@ sign === 'positive'
 : 'text-gray-600'
 }`}
                 >
-                {formatDecimalPtBR(value)}
+                {formatDecimalSafe(value)}
             </div>
                 </div>
         );

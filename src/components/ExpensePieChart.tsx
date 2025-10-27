@@ -1,65 +1,77 @@
 import React from 'react';
+import Decimal from 'decimal.js';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { TrendingDown } from 'lucide-react';
 
 interface ExpenseData {
     account: string;
-    amount: number;
-    isOthers?: boolean; // Optional property for the "Others" category
+    amount: Decimal;     // <- Decimal for exact math
+    isOthers?: boolean;
 }
 
 interface ExpensePieChartProps {
     expenses: ExpenseData[];
     currency: string;
-    maxItems?: number; // How many items to show (last slot becomes "Others" if needed)
+    maxItems?: number;
 }
+
+const getDecimalSeparator = (locale: string) =>
+  new Intl.NumberFormat(locale)
+    .formatToParts(1.1)
+    .find(p => p.type === 'decimal')?.value ?? '.';
+
+const formatDecimalSafe = (d: Decimal, locale = 'pt-BR'): string => {
+  const [intPart, fracPart] = d.toFixed().split('.');
+  const intFormatted = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(BigInt(intPart));
+  const sep = getDecimalSeparator(locale);
+  return fracPart ? `${intFormatted}${sep}${fracPart}` : intFormatted;
+};
 
 export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
     expenses,
     currency,
     maxItems = 10,
 }) => {
-    // Colors for the pie slices - red/orange gradient with a special color for "Others"
+    // Colors
     const COLORS = [
-        '#dc2626', // red-600
-        '#ea580c', // orange-600
-        '#f97316', // orange-500
-        '#fb923c', // orange-400
-        '#fdba74', // orange-300
-        '#fed7aa', // orange-200
-        '#ffedd5', // orange-100
-        '#fef3c7', // amber-100
-        '#fde68a', // amber-200
-        '#fcd34d', // amber-300
+        '#dc2626', '#ea580c', '#f97316', '#fb923c', '#fdba74',
+        '#fed7aa', '#ffedd5', '#fef3c7', '#fde68a', '#fcd34d',
     ];
-    const othersColor = '#6b7280'; // Gray color for "Others" category
+    const othersColor = '#6b7280';
 
-    const formatCurrency = (value: number) =>
-        new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: currency || 'BRL',
-        }).format(Math.abs(value));
+    const formatCurrency = (d: Decimal) =>
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency || 'BRL' })
+    // toString to avoid JS float; but Intl needs a number => format string manually:
+    // We’ll format manually to preserve precision:
+    // .format(Number(d.toString()))  // would round if huge
+    // So instead, compose symbol + ptBR digits:
+    // However, for proper local currency symbol, we use Intl just for the symbol:
+    // We'll show digits via formatDecimalSafe.
+            .formatToParts(0)
+            .reduce((s, p) => {
+                if (p.type === 'currency') return `${p.value} ${formatDecimalSafe(d)}`;
+                return s;
+            }, '');
 
-    // Process expenses to create "top N-1 + Others"
+    // Top N-1 + Others, using Decimal
     const processedExpenses = React.useMemo<ExpenseData[]>(() => {
-        if (expenses.length <= maxItems) {
-            return expenses;
-        }
+        if (expenses.length <= maxItems) return expenses;
 
-        const topExpenses = expenses.slice(0, maxItems - 1);
-        const remainingExpenses = expenses.slice(maxItems - 1);
-        const othersSum = remainingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+        const top = expenses.slice(0, maxItems - 1);
+        const rest = expenses.slice(maxItems - 1);
+        const othersSum = rest.reduce((sum, e) => sum.plus(e.amount), new Decimal(0));
 
-        const othersCategory: ExpenseData = {
-            account: `Others (${remainingExpenses.length} accounts)`,
-            amount: othersSum,
-            isOthers: true,
-        };
-
-        return [...topExpenses, othersCategory];
+        return [
+            ...top,
+            {
+                account: `Others (${rest.length} accounts)`,
+                amount: othersSum,
+                isOthers: true,
+            },
+        ];
     }, [expenses, maxItems]);
 
-    // Stable color map so colors don't jump when filtering
+    // Stable color map
     const colorMap = React.useMemo(() => {
         const map = new Map<string, string>();
         processedExpenses.forEach((e, idx) => {
@@ -68,35 +80,54 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         return map;
     }, [processedExpenses]);
 
-    // Hidden accounts toggle
+    // Hidden toggle
     const [hidden, setHidden] = React.useState<Set<string>>(new Set());
     const toggleAccount = (account: string) => {
-        setHidden((prev) => {
+        setHidden(prev => {
             const next = new Set(prev);
-            if (next.has(account)) next.delete(account);
-            else next.add(account);
+            next.has(account) ? next.delete(account) : next.add(account);
             return next;
         });
     };
     const resetFilters = () => setHidden(new Set());
 
-    // Only visible items are included in the pie and percentage accounting
     const visibleExpenses = React.useMemo(
-        () => processedExpenses.filter((e) => !hidden.has(e.account)),
+        () => processedExpenses.filter(e => !hidden.has(e.account)),
         [processedExpenses, hidden]
     );
 
-    const totalVisible = visibleExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalVisible = React.useMemo(
+        () => visibleExpenses.reduce((s, e) => s.plus(e.amount), new Decimal(0)),
+        [visibleExpenses]
+    );
 
-    const dataWithPercentage = visibleExpenses.map((e) => ({
-        ...e,
-        percentage: totalVisible > 0 ? ((e.amount / totalVisible) * 100).toFixed(1) : '0.0',
-    }));
+    // Data for chart: compute percentage as string; pass a numeric clone ONLY to Recharts
+    const dataWithPercentage = React.useMemo(
+        () =>
+            visibleExpenses.map(e => {
+                const pct =
+                    totalVisible.gt(0)
+                    ? e.amount.div(totalVisible).mul(100).toFixed(1)
+                    : '0.0';
+                return {
+                    ...e,
+                    // for recharts
+                    amountNumber: Number(e.amount.toString()), // used solely for arc sizes
+                    percentage: pct,
+                };
+            }),
+        [visibleExpenses, totalVisible]
+    );
 
-    // Tooltip & label for the pie
+    // Tooltip
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload[0]) {
-            const d = payload[0].payload;
+            const d = payload[0].payload as {
+                account: string;
+                amount: Decimal;
+                isOthers?: boolean;
+                percentage: string;
+            };
             return (
                 <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
                     <p className="font-semibold text-gray-800">{d.account}</p>
@@ -105,7 +136,9 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
                 </p>
                     <p className="text-sm text-gray-600">{d.percentage}% of visible total</p>
                     {d.isOthers && (
-                        <p className="text-xs text-gray-500 mt-1">Combined total of remaining expenses</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Combined total of remaining expenses
+                        </p>
                     )}
                 </div>
             );
@@ -120,7 +153,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-        if (parseFloat(percentage) < 5) return null; // Hide labels for tiny slices
+        if (parseFloat(percentage) < 5) return null;
 
         return (
             <text
@@ -186,7 +219,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
                 labelLine={false}
                 label={renderCustomizedLabel}
                 outerRadius={150}
-                dataKey="amount"
+                dataKey="amountNumber"   // <- numeric only for rendering
                 onClick={(_, index) => {
                     const d = dataWithPercentage[index];
                     if (d) toggleAccount(d.account);
@@ -205,21 +238,17 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
                     </ResponsiveContainer>
                     </div>
 
-                    {/* Legend / List (shows all items; hidden items display real amount and no %) */}
+                    {/* Legend / List */}
                     <div className="flex flex-col justify-center">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Expense Breakdown</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                     {processedExpenses.map((expense) => {
                         const isHidden = hidden.has(expense.account);
                         const color = colorMap.get(expense.account) || '#999';
-
-                        // Find visible recomputed entry (if not hidden)
                         const current = dataWithPercentage.find((d) => d.account === expense.account);
 
-                        // Amount: show real original when hidden; recomputed when visible
+                        // Amount shown: original when hidden; recomputed visible when not hidden
                         const displayAmount = isHidden ? expense.amount : (current?.amount ?? expense.amount);
-
-                        // Percentage: exclude hidden from accounting
                         const displayPct = isHidden ? '—' : (current ? `${current.percentage}%` : '—');
 
                         return (
@@ -281,11 +310,11 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
                     )}
                 </div>
 
-                    {/* Note about Others category */}
+                    {/* Note about Others */}
                 {expenses.length > maxItems && (
                     <div className="mt-4 p-3 bg-gray-50 rounded text-sm text-gray-600">
-                        <strong>Note:</strong> The "Others" category combines {expenses.length - maxItems + 1}{' '}
-                    expense accounts that weren&apos;t shown individually.
+                        <strong>Note:</strong> The "Others" category combines{' '}
+                    {expenses.length - maxItems + 1} expense accounts that weren’t shown individually.
                         </div>
                 )}
                 </div>
@@ -297,7 +326,7 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
                     </div>
             )}
 
-        {/* If everything is hidden, a gentle hint */}
+        {/* If everything is hidden */}
         {nothingVisible && (
             <div className="mt-6 text-center text-sm text-gray-500">
                 All categories are hidden.{' '}
@@ -312,4 +341,3 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
 };
 
 export default ExpensePieChart;
-
