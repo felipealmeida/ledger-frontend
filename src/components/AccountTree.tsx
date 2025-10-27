@@ -6,7 +6,6 @@ interface AccountTreeProps {
     accounts: LedgerAccount[];
     onAccountSelect?: (account: string, showTransactions?: boolean) => void;
     selectedAccount?: string;
-    currency?: string;
 }
 
 interface AccountNodeProps {
@@ -16,63 +15,39 @@ interface AccountNodeProps {
     level?: number;
     isLastChild?: boolean;
     parentConnections?: boolean[];
-    currency?: string;
 }
 
-// Helper function to parse amount from the new format
-const parseAmount = (amounts: Record<string, string>, currency: string = 'BRL'): number => {
-    if (!amounts || typeof amounts !== 'object') return 0;
+// Helper function to get all non-zero amounts
+const getNonZeroAmounts = (amounts: Record<string, string>): Array<{currency: string, value: string}> => {
+    if (!amounts || typeof amounts !== 'object') return [];
     
-    const amountStr = amounts[currency] || amounts[currency.toLowerCase()] || '0';
-    // Remove formatting: "693928,00" -> 693928.00
-    // Handle both Brazilian format (1.234,56) and US format (1,234.56)
-    const cleanValue = amountStr.toString()
-        .replace(/\./g, '') // Remove thousand separators (dots)
-        .replace(',', '.'); // Convert decimal comma to dot
-    
-    return parseFloat(cleanValue) || 0;
+    return Object.entries(amounts)
+        .filter(([_, value]) => {
+            // Check if value is not zero
+            const cleanValue = value.replace(/[^\d,.-]/g, '');
+            const numericValue = cleanValue.replace(/\./g, '').replace(',', '.');
+            const parsed = parseFloat(numericValue);
+            return !isNaN(parsed) && parsed !== 0;
+        })
+        .map(([currency, value]) => ({ currency, value }));
 };
 
-// Helper function to format amount for display
-const formatAmount = (amounts: Record<string, string>, currency: string = 'BRL'): string => {
-    const amount = parseAmount(amounts, currency);
-    return new Intl.NumberFormat('pt-BR', { 
-        style: 'currency', 
-        currency: currency 
-    }).format(amount);
-};
-
-// Helper function to get primary amount (first non-zero amount or BRL)
-const getPrimaryAmount = (amounts: Record<string, string>, preferredCurrency: string = 'BRL'): number => {
-    // Try preferred currency first
-    const preferred = parseAmount(amounts, preferredCurrency);
-    if (preferred !== 0) return preferred;
+// Helper function to determine if amount is positive, negative, or zero
+const getAmountSign = (amountStr: string): 'positive' | 'negative' | 'zero' => {
+    if (!amountStr) return 'zero';
     
-    // Otherwise, find first non-zero amount
-    for (const [currency, value] of Object.entries(amounts)) {
-        const amount = parseAmount(amounts, currency);
-        if (amount !== 0) return amount;
-    }
+    // Remove formatting and check for negative sign
+    const cleanValue = amountStr.replace(/[^\d,.-]/g, '');
     
-    return 0;
-};
-
-// Recursive function to calculate parent amounts from children
-const calculateParentAmounts = (node: LedgerAccount, currency: string = 'BRL'): number => {
-    if (!node.children || node.children.length === 0) {
-        return parseAmount(node.amounts, currency);
-    }
+    if (cleanValue.includes('-')) return 'negative';
     
-    // Sum all children
-    const childrenSum = node.children.reduce((sum, child) => {
-        return sum + calculateParentAmounts(child, currency);
-    }, 0);
+    // Check if it's zero
+    const numericValue = cleanValue.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(numericValue);
     
-    // Get node's own amount
-    const nodeAmount = parseAmount(node.amounts, currency);
+    if (isNaN(parsed) || parsed === 0) return 'zero';
     
-    // If node has its own amount, use it; otherwise use children sum
-    return nodeAmount !== 0 ? nodeAmount : childrenSum;
+    return 'positive';
 };
 
 const AccountNode: React.FC<AccountNodeProps> = ({ 
@@ -81,8 +56,7 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     selectedAccount, 
     level = 0,
     isLastChild = false,
-    parentConnections = [],
-    currency = 'BRL'
+    parentConnections = []
 }) => {
     const [isExpanded, setIsExpanded] = React.useState(true);
     
@@ -90,16 +64,9 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     const hasChildren = account.children && account.children.length > 0;
     const isSelected = selectedAccount === accountPath;
     
-    // Calculate amounts
-    const totalAmount = React.useMemo(() => {
-        return calculateParentAmounts(account, currency);
-    }, [account, currency]);
-    
-    const clearedAmount = React.useMemo(() => {
-        // For now, use the same as total amount
-        // You can adjust this if you have cleared amounts in the API
-        return totalAmount;
-    }, [totalAmount]);
+    // Get all non-zero amounts
+    const amounts = getNonZeroAmounts(account.amounts);
+    const hasMultipleCurrencies = amounts.length > 1;
     
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -142,7 +109,7 @@ const AccountNode: React.FC<AccountNodeProps> = ({
                 className="absolute h-px bg-gray-300"
                 style={{
                     left: `${(level - 1) * 20 + 10}px`,
-                    top: '20px',
+                    top: hasMultipleCurrencies ? '50%' : '20px',
                     width: '10px',
                 }}
                     />
@@ -152,10 +119,11 @@ const AccountNode: React.FC<AccountNodeProps> = ({
             lines.push(
                 <div
                 key="vertical"
-                className={`absolute w-px bg-gray-300 ${isLastChild ? 'h-5' : 'h-full'}`}
+                className={`absolute w-px bg-gray-300 ${isLastChild ? '' : 'h-full'}`}
                 style={{
                     left: `${(level - 1) * 20 + 10}px`,
                     top: 0,
+                    height: isLastChild ? (hasMultipleCurrencies ? '50%' : '20px') : '100%'
                 }}
                     />
             );
@@ -167,11 +135,83 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     // Get last cleared date if available
     const lastClearedDate = account.lastClearedDate || '';
     
+    // Render a single currency row
+    const renderCurrencyRow = (currencyData: {currency: string, value: string}, isFirst: boolean) => {
+        const amountSign = getAmountSign(currencyData.value);
+        
+        return (
+            <div key={currencyData.currency} className="grid grid-cols-4 gap-4 items-center py-2">
+                {/* Account Name Column - only show on first row */}
+                <div 
+            className="flex items-center relative z-10" 
+            style={{ paddingLeft: `${level * 20 + (level > 0 ? 20 : 0)}px` }}
+                >
+                {isFirst && hasChildren && (
+                    <button 
+                    onClick={handleToggle}
+                    className="p-1 hover:bg-blue-100 rounded-full transition-all duration-200 mr-2 border border-transparent hover:border-blue-200"
+                    >
+                    {isExpanded ? 
+                        <ChevronDown size={14} className="text-gray-700" /> : 
+                        <ChevronRight size={14} className="text-gray-700" />
+                        }
+                    </button>
+                )}
+            {!isFirst && hasChildren && (
+                <div className="w-8 mr-2" /> // Spacer for alignment
+            )}
+            {isFirst && (
+                <>
+                    <span 
+                className={`font-medium transition-colors ${
+level === 0 
+? 'text-gray-900 font-semibold' 
+: level === 1 
+? 'text-gray-800' 
+: 'text-gray-700'
+}`}
+                style={{ fontSize: level === 0 ? '0.95rem' : '0.875rem' }}
+                    >
+                    {account.account}
+                </span>
+                    {hasChildren && (
+                        <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {account.children?.length}
+                        </span>
+                    )}
+                </>
+            )}
+            </div>
+                
+                {/* Last Cleared Date Column - only show on first row */}
+                <div className={`text-sm ${level === 0 ? 'text-gray-600' : 'text-gray-500'}`}>
+                {isFirst ? lastClearedDate : ''}
+            </div>
+                
+                {/* Currency Label Column */}
+                <div className="text-right text-xs text-gray-500 font-medium">
+                {currencyData.currency}
+            </div>
+                
+                {/* Amount Column */}
+                <div
+            className={`font-mono text-right font-semibold ${
+amountSign === 'positive' ? 'text-green-600' : 
+amountSign === 'negative' ? 'text-red-600' : 
+'text-gray-600'
+}`}
+                >
+                {currencyData.value}
+            </div>
+                </div>
+        );
+    };
+    
     return (
         <div>
             <div
         className={`
-relative grid grid-cols-4 gap-4 items-center py-2 border-b cursor-pointer transition-all duration-200
+relative border-b cursor-pointer transition-all duration-200
 ${isSelected 
 ? 'bg-blue-50 border-l-4 border-l-blue-500 shadow-sm' 
 : 'hover:bg-gray-50 hover:shadow-sm'
@@ -182,70 +222,55 @@ ${isSelected
             {/* Tree lines */}
         {renderTreeLines()}
         
-        {/* Account Name Column with enhanced styling */}
-            <div 
-        className="flex items-center relative z-10" 
-        style={{ paddingLeft: `${level * 20 + (level > 0 ? 20 : 0)}px` }}
-            >
-            {hasChildren && (
-                <button 
-                onClick={handleToggle}
-                className="p-1 hover:bg-blue-100 rounded-full transition-all duration-200 mr-2 border border-transparent hover:border-blue-200"
+        {/* Render each currency */}
+        {amounts.length > 0 ? (
+            amounts.map((currencyData, index) => 
+                renderCurrencyRow(currencyData, index === 0)
+                       )
+        ) : (
+            // Empty account with no amounts
+            <div className="grid grid-cols-4 gap-4 items-center py-2">
+                <div 
+            className="flex items-center relative z-10" 
+            style={{ paddingLeft: `${level * 20 + (level > 0 ? 20 : 0)}px` }}
                 >
-                {isExpanded ? 
-                    <ChevronDown size={14} className="text-gray-700" /> : 
-                    <ChevronRight size={14} className="text-gray-700" />
-                    }
-                </button>
-            )}
-            <span 
-        className={`font-medium transition-colors ${
+                {hasChildren && (
+                    <button 
+                    onClick={handleToggle}
+                    className="p-1 hover:bg-blue-100 rounded-full transition-all duration-200 mr-2 border border-transparent hover:border-blue-200"
+                        >
+                        {isExpanded ? 
+                            <ChevronDown size={14} className="text-gray-700" /> : 
+                            <ChevronRight size={14} className="text-gray-700" />
+                            }
+                    </button>
+                )}
+                <span 
+            className={`font-medium transition-colors ${
 level === 0 
 ? 'text-gray-900 font-semibold' 
 : level === 1 
 ? 'text-gray-800' 
 : 'text-gray-700'
 }`}
-        style={{ fontSize: level === 0 ? '0.95rem' : '0.875rem' }}
-            >
-            {account.account}
-        </span>
-            {hasChildren && (
-                <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {account.children?.length}
-                </span>
-            )}
-        </div>
-            
-            {/* Last Cleared Date Column */}
-            <div className={`text-sm ${level === 0 ? 'text-gray-600' : 'text-gray-500'}`}>
-            {lastClearedDate}
-        </div>
-            
-            {/* Cleared Amount Column */}
-            <div
-        className={`font-mono text-right font-medium ${
-clearedAmount > 0 ? 'text-green-600' : clearedAmount < 0 ? 'text-red-600' : 'text-gray-600'
-}`}
-            >
-            {new Intl.NumberFormat('pt-BR', { 
-                style: 'currency', 
-                currency: currency 
-            }).format(clearedAmount)}
-        </div>
-            
-            {/* Total Amount Column */}
-            <div
-        className={`font-mono text-right font-semibold ${
-totalAmount > 0 ? 'text-green-600' : totalAmount < 0 ? 'text-red-600' : 'text-gray-600'
-}`}
-            >
-            {new Intl.NumberFormat('pt-BR', { 
-                style: 'currency', 
-                currency: currency 
-            }).format(totalAmount)}
-        </div>
+            style={{ fontSize: level === 0 ? '0.95rem' : '0.875rem' }}
+                >
+                {account.account}
+            </span>
+                {hasChildren && (
+                    <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {account.children?.length}
+                    </span>
+                )}
             </div>
+                <div className={`text-sm ${level === 0 ? 'text-gray-600' : 'text-gray-500'}`}>
+                {lastClearedDate}
+            </div>
+                <div className="text-right text-xs text-gray-400">—</div>
+                <div className="text-right text-gray-400 font-mono">—</div>
+                </div>
+        )}
+        </div>
             
             {isExpanded && hasChildren && account.children && (
                 <div>
@@ -267,7 +292,6 @@ totalAmount > 0 ? 'text-green-600' : totalAmount < 0 ? 'text-red-600' : 'text-gr
                             level={level + 1}
                             isLastChild={isLast}
                             parentConnections={newParentConnections}
-                            currency={currency}
                                 />
                         );
                     })}
@@ -280,8 +304,7 @@ totalAmount > 0 ? 'text-green-600' : totalAmount < 0 ? 'text-red-600' : 'text-gr
 export const AccountTree: React.FC<AccountTreeProps> = ({ 
     accounts, 
     onAccountSelect, 
-    selectedAccount,
-    currency = 'BRL'
+    selectedAccount
 }) => {
     // Sort accounts alphabetically
     const sortedAccounts = React.useMemo(() => {
@@ -311,8 +334,8 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
             <div className="grid grid-cols-4 gap-4 bg-gray-50 px-4 py-3 border-b font-semibold text-sm text-gray-700">
             <div>Account</div>
             <div>Last Cleared</div>
-            <div className="text-right">Cleared Amount</div>
-            <div className="text-right">Total Amount</div>
+            <div className="text-right">Currency</div>
+            <div className="text-right">Amount</div>
             </div>
             
             {/* Tree Content */}
@@ -328,7 +351,6 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
                     level={0}
                     isLastChild={isLast}
                     parentConnections={[]}
-                    currency={currency}
                         />
                 );
             })}
