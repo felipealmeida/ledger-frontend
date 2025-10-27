@@ -87,7 +87,13 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     ) => {
         const sign = getAmountSign(value);
         return (
-            <div key={currency} className="grid grid-cols-4 gap-4 items-center py-2">
+            <div
+            key={currency}
+            className={`relative grid grid-cols-4 gap-4 items-center py-2`}
+                >
+                {isFirst && (
+                    <div className="absolute inset-x-0 -top-px h-[1px] bg-gray-300" />
+                )}
                 <div
             className="flex items-center"
             style={{ paddingLeft: `${level * 20 + (level > 0 ? 20 : 0)}px` }}
@@ -106,6 +112,7 @@ const AccountNode: React.FC<AccountNodeProps> = ({
                 )}
             {isFirst && (
                 <>
+                    <span className="mr-2 inline-block h-3 w-0.5 bg-gray-300 rounded" aria-hidden />
                     <span
                 className={`font-medium ${
 level === 0
