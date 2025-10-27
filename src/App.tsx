@@ -534,7 +534,6 @@ showExpenseDiff
                 {!selectedAccount && !transactionData && (
                     <BalanceSummary 
                     accounts={data.account.children || []} 
-                    currency={data?.currency || 'BRL'} 
                         />
                 )}
 
