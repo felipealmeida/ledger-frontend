@@ -4,121 +4,51 @@ import { LedgerAccount } from '../types/api';
 
 interface BalanceSummaryProps {
     accounts: LedgerAccount[];
-    labels?: Partial<Record<'assets' | 'expenses' | 'income' | 'liabilities', string>>;
 }
 
-const normalize = (s: string) =>
-    s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-const firstSegment = (path: string) => (path || '').split(':')[0] || '';
-
-const getTopLevel = (accounts: LedgerAccount[], names: string[]): LedgerAccount | undefined => {
-    const wanted = names.map(normalize);
-    for (const acc of accounts) {
-        const first = normalize(firstSegment(acc.fullPath || acc.account || ''));
-        if (wanted.includes(first)) return acc;
-    }
-    return undefined;
+const findTop = (list: LedgerAccount[], names: string[]) => {
+    const n = names.map((x) => x.toLowerCase());
+    return list.find((a) => n.includes((a.fullPath || a.account).split(':')[0].toLowerCase()));
 };
 
-const SummaryCard: React.FC<{
-    title: string;
-    value: string | undefined;
-    Icon: React.ComponentType<{ className?: string }>;
-    borderClass: string;
-    iconClass: string;
-    currency: string;
-}> = ({ title, value, Icon, borderClass, iconClass, currency }) => (
-    <div className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${borderClass}`}>
-        <div className="flex items-center justify-between">
-        <div>
-        <p className="text-gray-600 text-sm font-medium">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 mt-1">
-        {value ?? '—'} <span className="ml-2 text-sm text-gray-500">{currency}</span>
-        </p>
-        </div>
-        <div className="p-3 rounded-full bg-gray-100">
-        <Icon className={`h-6 w-6 ${iconClass}`} />
-        </div>
-        </div>
-        </div>
-);
-
-export const BalanceSummary: React.FC<BalanceSummaryProps> = ({
-    accounts,
-    labels,
-}) => {
-    const names = {
-        assets: ['Ativos'],
-        expenses: ['Despesas'],
-        income: ['Receitas'],
-        liabilities: ['Passivos', 'Passivo'],
-    };
-
-    const top = useMemo(() => {
-        const assets = getTopLevel(accounts, names.assets);
-        const expenses = getTopLevel(accounts, names.expenses);
-        const income = getTopLevel(accounts, names.income);
-        const liabilities = getTopLevel(accounts, names.liabilities);
-        return { assets, expenses, income, liabilities };
+export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts }) => {
+    const { map, currencies } = useMemo(() => {
+        const map = {
+            assets: findTop(accounts, ['Ativos']),
+            liabilities: findTop(accounts, ['Passivos', 'Passivo']),
+            expenses: findTop(accounts, ['Despesas']),
+            income: findTop(accounts, ['Receitas']),
+        };
+        const set = new Set<string>();
+        Object.values(map).forEach((a) => a && Object.keys(a.amounts).forEach((k) => set.add(k)));
+        return { map, currencies: Array.from(set) };
     }, [accounts]);
 
-    // Auto-detect currencies from the four top-level accounts' amounts maps.
-    const currenciesToShow = useMemo(() => {
-        const set = new Set<string>();
-        [top.assets, top.expenses, top.income, top.liabilities].forEach((acc) => {
-            if (!acc) return;
-            Object.keys(acc.amounts || {}).forEach((k) => set.add(k));
-        });
-        return Array.from(set);
-    }, [top.assets, top.expenses, top.income, top.liabilities]);
+    const icon = {
+        assets: <TrendingUp className="w-3 h-3 text-green-600" />, 
+        liabilities: <TrendingDown className="w-3 h-3 text-red-600" />, 
+        expenses: <TrendingDown className="w-3 h-3 text-orange-600" />, 
+        income: <DollarSign className="w-3 h-3 text-blue-600" />,
+    };
 
-    const lbl = {
-        assets: labels?.assets ?? 'Ativos',
-        expenses: labels?.expenses ?? 'Despesas',
-        income: labels?.income ?? 'Receitas',
-        liabilities: labels?.liabilities ?? 'Passivos',
-    } as const;
+    const color = {
+        assets: 'border-l-green-500',
+        liabilities: 'border-l-red-500',
+        expenses: 'border-l-orange-500',
+        income: 'border-l-blue-500',
+    };
 
     return (
-        <div className="space-y-8">
-            {currenciesToShow.map((cur) => (
-                <div key={cur}>
-                    <h3 className="text-sm font-semibold text-gray-500 mb-3">{cur}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <SummaryCard
-                title={lbl.assets}
-                value={top.assets?.amounts?.[cur]}
-                currency={cur}
-                Icon={TrendingUp}
-                borderClass="border-l-green-500"
-                iconClass="text-green-600"
-                    />
-                    <SummaryCard
-                title={lbl.liabilities}
-                value={top.liabilities?.amounts?.[cur]}
-                currency={cur}
-                Icon={TrendingDown}
-                borderClass="border-l-red-500"
-                iconClass="text-red-600"
-                    />
-                    <SummaryCard
-                title={lbl.expenses}
-                value={top.expenses?.amounts?.[cur]}
-                currency={cur}
-                Icon={TrendingDown}
-                borderClass="border-l-orange-500"
-                iconClass="text-orange-600"
-                    />
-                    <SummaryCard
-                title={lbl.income}
-                value={top.income?.amounts?.[cur]}
-                currency={cur}
-                Icon={DollarSign}
-                borderClass="border-l-blue-500"
-                iconClass="text-blue-600"
-                    />
-                    </div>
-                    </div>
+        <div className="text-xs space-y-1">
+            {currencies.map((cur) => (
+                <div key={cur} className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                    {(['assets', 'liabilities', 'expenses', 'income'] as const).map((k) => (
+                        <div key={k} className={`px-2 py-1 bg-white border-l-2 ${color[k]} flex items-center justify-between rounded-sm shadow-sm`}>
+                            <span className="truncate text-gray-700">{map[k]?.amounts[cur] ?? '—'}</span>
+                            <span className="flex items-center gap-1 text-gray-500">{icon[k]} {cur}</span>
+                            </div>
+                    ))}
+                </div>
             ))}
         </div>
     );
