@@ -28,9 +28,13 @@ function App() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
-    const [currentPeriod, setCurrentPeriod] = useState('');
+    const [afterPeriod, setAfterPeriod] = useState<string | null>(null);
+    const [beforePeriod, setBeforePeriod] = useState<string | null>(null);
     const [showExpenseChart, setShowExpenseChart] = useState(false);
     const [maxExpenseItems, setMaxExpenseItems] = useState(25);
+    const [dateFrom, setDateFrom] = useState<string>('');
+    const [dateTo, setDateTo] = useState<string>('');
+    const [currentPeriod] = useState<string>('');
 
     // Controls state
     const [currentCommand, setCurrentCommand] = useState('bal');
@@ -77,7 +81,7 @@ function App() {
                 setTransactionData(null);
                 setBudgetData(null);
             } else {
-                const response = await LedgerApiService.getBalance(currentCommand, currentPeriod || undefined);
+                const response = await LedgerApiService.getBalance(currentCommand, afterPeriod, beforePeriod);
                 setData(response);
                 setCashFlowData(null);
                 setTransactionData(null);
@@ -165,8 +169,10 @@ function App() {
         }
     };
 
-    const handlePeriodChange = (period: string) => {
-        setCurrentPeriod(period);
+    const handlePeriodChange = (after: string | null, before: string | null) => {
+        //setCurrentPeriod(period);
+        setAfterPeriod(after);
+        setBeforePeriod(before);
         setSelectedAccount('');
         setShowExpenseChart(false);
         setShowExpenseDiff(false);
@@ -268,8 +274,8 @@ function App() {
 
         try {
             const [respA, respB] = await Promise.all([
-                LedgerApiService.getBalance('bal', comparePeriodA),
-                LedgerApiService.getBalance('bal', comparePeriodB),
+                LedgerApiService.getBalance('bal', null, null),
+                LedgerApiService.getBalance('bal', null, null),
             ]);
 
             const a = {

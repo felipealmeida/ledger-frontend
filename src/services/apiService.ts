@@ -24,8 +24,10 @@ export class LedgerApiService {
     /**
      * Get all account balances
      */
-    static async getBalance(command?: string, period?: string): Promise<LedgerBalanceResponse> {
+    static async getBalance(command: string, after: string | null, before: string | null): Promise<LedgerBalanceResponse> {
         const params = new URLSearchParams();
+        if (after) params.append('after', after);
+        if (before) params.append('before', before);
         
         const response = await api.get<LedgerBalanceResponse>(
             `/api/balance${params.toString() ? `?${params.toString()}` : ''}`
