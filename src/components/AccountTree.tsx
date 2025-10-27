@@ -2,6 +2,7 @@ import React from 'react';
 import Decimal from 'decimal.js';
 import { LedgerAccount, AccWithBig } from '../types/api';
 import { ChevronRight, ChevronDown } from 'lucide-react';
+import { formatDecimalByCommodity } from './FormatDecimal';
 
 interface AccountTreeProps {
     accounts: AccWithBig[]; // plural (you iterate a list)
@@ -26,18 +27,6 @@ function assertHasBig(
         throw new Error('amountsBigInt is missing. Ensure withBigInts() was applied before rendering.');
     }
 }
-
-const getDecimalSeparator = (locale: string) =>
-  new Intl.NumberFormat(locale)
-    .formatToParts(1.1)
-    .find(p => p.type === 'decimal')?.value ?? '.';
-
-const formatDecimalSafe = (d: Decimal, locale = 'pt-BR'): string => {
-  const [intPart, fracPart] = d.toFixed().split('.');
-  const intFormatted = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(BigInt(intPart));
-  const sep = getDecimalSeparator(locale);
-  return fracPart ? `${intFormatted}${sep}${fracPart}` : intFormatted;
-};
 
 const getAmountSign = (d: Decimal) =>
     d.isZero() ? 'zero' : d.isPositive() ? 'positive' : 'negative';
@@ -136,7 +125,7 @@ sign === 'positive'
 : 'text-gray-600'
 }`}
                 >
-                {formatDecimalSafe(value)}
+                {formatDecimalByCommodity(currency, value)}
             </div>
                 </div>
         );
