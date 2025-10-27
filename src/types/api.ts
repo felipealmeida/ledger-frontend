@@ -1,42 +1,43 @@
+export type AmountsMap = Record<string, string>;
+
 export interface LedgerAccount {
-  account: string;
-  amount: number;
-  clearedAmount: number;
-  lastClearedDate: string;
-  children: LedgerAccount[];
-  fullPath: string;
+    account: string;
+    fullPath: string;
+    amounts: AmountsMap;
+    lastClearedDate?: string | null;
+    children?: LedgerAccount[];
+    currency?: string;
 }
 
 export interface LedgerBalanceResponse {
-  accounts: LedgerAccount[];
-  currency: string;
-  timestamp: string;
-  total: number;
+    account: LedgerAccount;
+    timestamp: string;
+    currency?: string;
 }
 
 export interface HealthResponse {
-  status: string;
-  timestamp: string;
-  service: string;
+    status: string;
+    timestamp: string;
+    service: string;
 }
 
 export interface ApiError {
-  error: string;
-  details?: any;
+    error: string;
+    details?: any;
 }
 
 export interface TransactionData {
-  transactions: Transaction[];
-  account: string;
-  period?: string;
-  timestamp: string;
+    transactions: Transaction[];
+    account: string;
+    period?: string;
+    timestamp: string;
 }
 
 export interface Transaction {
-  date: string;
-  description: string;
-  amount: number;
-  runningBalance: number;
+    date: string;
+    description: string;
+    amount: number;
+    runningBalance: number;
 }
 
 export interface LedgerSubTotalNode {

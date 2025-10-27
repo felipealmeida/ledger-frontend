@@ -26,8 +26,6 @@ export class LedgerApiService {
      */
     static async getBalance(command?: string, period?: string): Promise<LedgerBalanceResponse> {
         const params = new URLSearchParams();
-        if (command) params.append('command', command);
-        if (period) params.append('period', period);
         
         const response = await api.get<LedgerBalanceResponse>(
             `/api/balance${params.toString() ? `?${params.toString()}` : ''}`

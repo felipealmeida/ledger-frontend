@@ -6,6 +6,7 @@ interface AccountTreeProps {
     accounts: LedgerAccount[];
     onAccountSelect?: (account: string, showTransactions?: boolean) => void;
     selectedAccount?: string;
+    currency?: string;
 }
 
 interface AccountNodeProps {
@@ -15,125 +16,63 @@ interface AccountNodeProps {
     level?: number;
     isLastChild?: boolean;
     parentConnections?: boolean[];
+    currency?: string;
 }
 
-// Helper function to build tree from flat list with paths
-const buildTreeFromPaths = (accounts: LedgerAccount[]): LedgerAccount[] => {
-    const tree: LedgerAccount[] = [];
-    const nodeMap = new Map<string, LedgerAccount>();
+// Helper function to parse amount from the new format
+const parseAmount = (amounts: Record<string, string>, currency: string = 'BRL'): number => {
+    if (!amounts || typeof amounts !== 'object') return 0;
     
-    // First, create all necessary parent nodes
-    accounts.forEach(account => {
-        const path = account.fullPath || account.account;
-        const parts = path.split(':');
-        
-        // Create parent nodes if they don't exist
-        let currentPath = '';
-        for (let i = 0; i < parts.length - 1; i++) {
-            currentPath = currentPath ? `${currentPath}:${parts[i]}` : parts[i];
+    const amountStr = amounts[currency] || amounts[currency.toLowerCase()] || '0';
+    // Remove formatting: "693928,00" -> 693928.00
+    // Handle both Brazilian format (1.234,56) and US format (1,234.56)
+    const cleanValue = amountStr.toString()
+        .replace(/\./g, '') // Remove thousand separators (dots)
+        .replace(',', '.'); // Convert decimal comma to dot
+    
+    return parseFloat(cleanValue) || 0;
+};
 
-            if (!nodeMap.has(currentPath)) {
-                nodeMap.set(currentPath, {
-                    account: parts[i],
-                    fullPath: currentPath,
-                    amount: 0,
-                    clearedAmount: 0,
-                    lastClearedDate: '',
-                    children: []
-                });
-            }
-        }
+// Helper function to format amount for display
+const formatAmount = (amounts: Record<string, string>, currency: string = 'BRL'): string => {
+    const amount = parseAmount(amounts, currency);
+    return new Intl.NumberFormat('pt-BR', { 
+        style: 'currency', 
+        currency: currency 
+    }).format(amount);
+};
 
-        // Add the actual account
-        nodeMap.set(path, {
-            ...account,
-            children: []
-        });
-    });
+// Helper function to get primary amount (first non-zero amount or BRL)
+const getPrimaryAmount = (amounts: Record<string, string>, preferredCurrency: string = 'BRL'): number => {
+    // Try preferred currency first
+    const preferred = parseAmount(amounts, preferredCurrency);
+    if (preferred !== 0) return preferred;
     
-    // Now build the tree structure
-    nodeMap.forEach((node, path) => {
-        const parts = path.split(':');
-        
-        if (parts.length === 1) {
-            // Root node
-            tree.push(node);
-        } else {
-            // Find parent and add as child
-            const parentPath = parts.slice(0, -1).join(':');
-            const parent = nodeMap.get(parentPath);
-            
-            if (parent) {
-                if (!parent.children) parent.children = [];
-                parent.children.push(node);
-            }
-        }
-    });
+    // Otherwise, find first non-zero amount
+    for (const [currency, value] of Object.entries(amounts)) {
+        const amount = parseAmount(amounts, currency);
+        if (amount !== 0) return amount;
+    }
     
-    // Calculate parent amounts (sum of children)
-    const calculateParentAmounts = (node: LedgerAccount): number => {
-        if (!node.children || node.children.length === 0) {
-            return node.amount;
-        }
-        
-        const childrenSum = node.children.reduce((sum, child) => {
-            return sum + calculateParentAmounts(child);
-        }, 0);
-        
-        // If this node has its own amount (from the original data), use it
-        // Otherwise, use the sum of children
-        const originalNode = accounts.find(acc => 
-            (acc.fullPath || acc.account) === (node.fullPath || node.account)
-                                          );
-        
-        if (originalNode) {
-            return node.amount;
-        } else {
-            node.amount = childrenSum;
-            return childrenSum;
-        }
-    };
+    return 0;
+};
 
-    // Calculate parent amounts (sum of children)
-    const calculateParentClearedAmounts = (node: LedgerAccount): number => {
-        if (!node.children || node.children.length === 0) {
-            return node.clearedAmount;
-        }
-        
-        const childrenSum = node.children.reduce((sum, child) => {
-            return sum + calculateParentClearedAmounts(child);
-        }, 0);
-        
-        // If this node has its own ClearedAmount (from the original data), use it
-        // Otherwise, use the sum of children
-        const originalNode = accounts.find(acc => 
-            (acc.fullPath || acc.account) === (node.fullPath || node.account)
-                                          );
-        
-        if (originalNode) {
-            return node.clearedAmount;
-        } else {
-            node.clearedAmount = childrenSum;
-            return childrenSum;
-        }
-    };
-
-    // Calculate ClearedAmounts for all root nodes
-    tree.forEach(node => calculateParentAmounts(node));
-    tree.forEach(node => calculateParentClearedAmounts(node));
+// Recursive function to calculate parent amounts from children
+const calculateParentAmounts = (node: LedgerAccount, currency: string = 'BRL'): number => {
+    if (!node.children || node.children.length === 0) {
+        return parseAmount(node.amounts, currency);
+    }
     
-    // Sort children alphabetically
-    const sortChildren = (node: LedgerAccount) => {
-        if (node.children && node.children.length > 0) {
-            node.children.sort((a, b) => a.account.localeCompare(b.account));
-            node.children.forEach(sortChildren);
-        }
-    };
+    // Sum all children
+    const childrenSum = node.children.reduce((sum, child) => {
+        return sum + calculateParentAmounts(child, currency);
+    }, 0);
     
-    tree.forEach(sortChildren);
-    tree.sort((a, b) => a.account.localeCompare(b.account));
+    // Get node's own amount
+    const nodeAmount = parseAmount(node.amounts, currency);
     
-    return tree;
+    // If node has its own amount, use it; otherwise use children sum
+    return nodeAmount !== 0 ? nodeAmount : childrenSum;
 };
 
 const AccountNode: React.FC<AccountNodeProps> = ({ 
@@ -142,13 +81,25 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     selectedAccount, 
     level = 0,
     isLastChild = false,
-    parentConnections = []
+    parentConnections = [],
+    currency = 'BRL'
 }) => {
     const [isExpanded, setIsExpanded] = React.useState(true);
     
     const accountPath = account.fullPath || account.account;
     const hasChildren = account.children && account.children.length > 0;
     const isSelected = selectedAccount === accountPath;
+    
+    // Calculate amounts
+    const totalAmount = React.useMemo(() => {
+        return calculateParentAmounts(account, currency);
+    }, [account, currency]);
+    
+    const clearedAmount = React.useMemo(() => {
+        // For now, use the same as total amount
+        // You can adjust this if you have cleared amounts in the API
+        return totalAmount;
+    }, [totalAmount]);
     
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -213,6 +164,9 @@ const AccountNode: React.FC<AccountNodeProps> = ({
         return lines;
     };
     
+    // Get last cleared date if available
+    const lastClearedDate = account.lastClearedDate || '';
+    
     return (
         <div>
             <div
@@ -265,25 +219,31 @@ level === 0
             
             {/* Last Cleared Date Column */}
             <div className={`text-sm ${level === 0 ? 'text-gray-600' : 'text-gray-500'}`}>
-            {account.lastClearedDate}
+            {lastClearedDate}
         </div>
             
             {/* Cleared Amount Column */}
             <div
         className={`font-mono text-right font-medium ${
-account.clearedAmount > 0 ? 'text-green-600' : 'text-red-600'
+clearedAmount > 0 ? 'text-green-600' : clearedAmount < 0 ? 'text-red-600' : 'text-gray-600'
 }`}
             >
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL'}).format(account.clearedAmount)}
+            {new Intl.NumberFormat('pt-BR', { 
+                style: 'currency', 
+                currency: currency 
+            }).format(clearedAmount)}
         </div>
             
             {/* Total Amount Column */}
             <div
         className={`font-mono text-right font-semibold ${
-account.amount > 0 ? 'text-green-600' : 'text-red-600'
+totalAmount > 0 ? 'text-green-600' : totalAmount < 0 ? 'text-red-600' : 'text-gray-600'
 }`}
             >
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL'}).format(account.amount)}
+            {new Intl.NumberFormat('pt-BR', { 
+                style: 'currency', 
+                currency: currency 
+            }).format(totalAmount)}
         </div>
             </div>
             
@@ -307,6 +267,7 @@ account.amount > 0 ? 'text-green-600' : 'text-red-600'
                             level={level + 1}
                             isLastChild={isLast}
                             parentConnections={newParentConnections}
+                            currency={currency}
                                 />
                         );
                     })}
@@ -319,17 +280,29 @@ account.amount > 0 ? 'text-green-600' : 'text-red-600'
 export const AccountTree: React.FC<AccountTreeProps> = ({ 
     accounts, 
     onAccountSelect, 
-    selectedAccount 
+    selectedAccount,
+    currency = 'BRL'
 }) => {
-    // Build tree from flat list
-    const treeAccounts = React.useMemo(() => {
-        const isTree = accounts.some(acc => acc.children && acc.children.length > 0);
+    // Sort accounts alphabetically
+    const sortedAccounts = React.useMemo(() => {
+        const sorted = [...accounts].sort((a, b) => 
+            a.account.localeCompare(b.account)
+                                         );
         
-        if (isTree) {
-            return accounts;
-        }
+        // Recursively sort children
+        const sortChildren = (account: LedgerAccount): LedgerAccount => {
+            if (account.children && account.children.length > 0) {
+                return {
+                    ...account,
+                    children: account.children
+                        .map(sortChildren)
+                        .sort((a, b) => a.account.localeCompare(b.account))
+                };
+            }
+            return account;
+        };
         
-        return buildTreeFromPaths(accounts);
+        return sorted.map(sortChildren);
     }, [accounts]);
     
     return (
@@ -344,8 +317,8 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
             
             {/* Tree Content */}
             <div className="divide-y divide-gray-100">
-            {treeAccounts.map((account, index) => {
-                const isLast = index === treeAccounts.length - 1;
+            {sortedAccounts.map((account, index) => {
+                const isLast = index === sortedAccounts.length - 1;
                 return (
                     <AccountNode
                     key={`${account.fullPath || account.account}-${index}`}
@@ -355,6 +328,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
                     level={0}
                     isLastChild={isLast}
                     parentConnections={[]}
+                    currency={currency}
                         />
                 );
             })}
