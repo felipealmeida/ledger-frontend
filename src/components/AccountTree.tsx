@@ -37,6 +37,11 @@ const getNonZeroAmounts = (acc: AccWithBig) => {
         .filter(([_, d]) => !d.isZero())
         .map(([currency, value]) => ({ currency, value }));
 };
+const norm = (s: string) =>
+    s
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase();
 
 const AccountNode: React.FC<AccountNodeProps> = ({
     account,
@@ -46,10 +51,11 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     isLastChild = false,
     parentConnections = [],
 }) => {
-    // Narrow immediately so the rest of the function is strictly typed
     assertHasBig(account);
 
-    const [isExpanded, setIsExpanded] = React.useState(true);
+    const isLiquidoNode = norm((account.account || '').split(':')[0]) === 'liquido';
+
+    const [isExpanded, setIsExpanded] = React.useState<boolean>(!isLiquidoNode);
     const accountPath = account.fullPath || account.account;
     const hasChildren = !!account.children?.length;
     const isSelected = selectedAccount === accountPath;
@@ -177,10 +183,25 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
                 ...a,
                 children: a.children
                     .map((c) => sortChildren(c as AccWithBig))
-                    .sort((x, y) => x.account.localeCompare(y.account)),
+                    .sort((x, y) => {
+                        const xIsLiquido = norm(x.account) === 'liquido';
+                        const yIsLiquido = norm(y.account) === 'liquido';
+                        if (xIsLiquido && !yIsLiquido) return 1;  // "Líquido" goes last
+                        if (!xIsLiquido && yIsLiquido) return -1; // "Líquido" goes last
+                        return x.account.localeCompare(y.account); // normal alphabetical otherwise
+                    }),
             };
         };
-        return [...accounts].map(sortChildren).sort((a, b) => a.account.localeCompare(b.account));
+
+        return [...accounts]
+            .map(sortChildren)
+            .sort((a, b) => {
+                const aIsLiquido = norm(a.account) === 'liquido';
+                const bIsLiquido = norm(b.account) === 'liquido';
+                if (aIsLiquido && !bIsLiquido) return 1;
+                if (!aIsLiquido && bIsLiquido) return -1;
+                return a.account.localeCompare(b.account);
+            });
     }, [accounts]);
 
     return (

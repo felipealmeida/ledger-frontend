@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import Decimal from 'decimal.js';
 import { LedgerAccount } from '../types/api';
+import { formatDecimalByCommodity } from './FormatDecimal';
 
 type AccWithBig = LedgerAccount & { amountsBigInt?: Record<string, Decimal> };
 
@@ -14,16 +15,6 @@ const findTop = (list: AccWithBig[], names: string[]) => {
     return list.find((a) =>
         n.includes((a.fullPath || a.account).split(':')[0].toLowerCase())
                     );
-};
-
-/** Format Decimal with pt-BR separators, preserving all fraction digits present */
-const formatDecimalPtBR = (d: Decimal | undefined): string => {
-    if (!d) return '—';
-    // Keep the natural scale of the Decimal
-    const s = d.toFixed(); // no rounding beyond existing scale
-    const [intPart, fracPart] = s.split('.');
-    const intBR = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return fracPart ? `${intBR},${fracPart}` : intBR;
 };
 
 export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts }) => {
@@ -65,28 +56,40 @@ export const BalanceSummary: React.FC<BalanceSummaryProps> = ({ accounts }) => {
 
     const order = ['assets', 'liabilities', 'expenses', 'income'] as const;
 
+    const assertHasBig: (acc: AccWithBig) => asserts acc is LedgerAccount & {
+        amountsBigInt: Record<string, Decimal>;
+    } = (acc) => {
+        if (!acc.amountsBigInt) {
+            throw new Error('amountsBigInt is missing. Ensure withBigInts() was applied before using this.');
+        }
+    };
+
     return (
         <div className="text-xs space-y-1">
             {currencies.map((cur) => (
                 <div key={cur} className="grid grid-cols-2 md:grid-cols-4 gap-1">
                     {order.map((k) => {
                         const acc = map[k];
-                        const valDec =
-                            (acc as AccWithBig)?.amountsBigInt?.[cur] ?? undefined;
+                        if (acc) {
+                            assertHasBig(acc);
+                            let valDec = acc.amountsBigInt[cur] ?? new Decimal('0');
+                            if ((k == 'liabilities' || k == 'income') && !valDec.isZero())
+                                valDec = valDec.neg();
 
-                        return (
-                            <div
-                            key={k}
-                            className={`px-2 py-1 bg-white border-l-2 ${color[k]} flex items-center justify-between rounded-sm shadow-sm`}
-                                >
-                                <span className="truncate text-gray-700">
-                                {formatDecimalPtBR(valDec)}
-                            </span>
-                                <span className="flex items-center gap-1 text-gray-500">
-                                {icon[k]} {cur}
-                            </span>
-                                </div>
-                        );
+                            return (
+                                <div
+                                key={k}
+                                className={`px-2 py-1 bg-white border-l-2 ${color[k]} flex items-center justify-between rounded-sm shadow-sm`}
+                                    >
+                                    <span className="truncate text-gray-700">
+                                    {formatDecimalByCommodity(cur, valDec)}
+                                </span>
+                                    <span className="flex items-center gap-1 text-gray-500">
+                                    {icon[k]} {cur}
+                                </span>
+                                    </div>
+                            );
+                        }
                     })}
                 </div>
             ))}
