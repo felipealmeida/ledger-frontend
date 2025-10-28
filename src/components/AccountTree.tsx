@@ -5,13 +5,13 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { formatDecimalByCommodity } from './FormatDecimal';
 
 interface AccountTreeProps {
-    accounts: AccWithBig[]; // plural (you iterate a list)
+    accounts: AccWithBig[];
     onAccountSelect?: (account: string, showTransactions?: boolean) => void;
     selectedAccount?: string;
 }
 
 interface AccountNodeProps {
-    account: AccWithBig; // singular (node renders a single account)
+    account: AccWithBig;
     onSelect?: (account: string, showTransactions?: boolean) => void;
     selectedAccount?: string;
     level?: number;
@@ -19,10 +19,10 @@ interface AccountNodeProps {
     parentConnections?: boolean[];
 }
 
-/** Runtime assertion that also narrows the type for TS */
+/** Assert amountsBigInt exists; cleared is optional */
 function assertHasBig(
     acc: AccWithBig
-): asserts acc is LedgerAccount & { amountsBigInt: Record<string, Decimal> } {
+): asserts acc is LedgerAccount & { amountsBigInt: Record<string, Decimal>, clearedAmountsBigInt: Record<string, Decimal> } {
     if (!acc.amountsBigInt) {
         throw new Error('amountsBigInt is missing. Ensure withBigInts() was applied before rendering.');
     }
@@ -31,9 +31,9 @@ function assertHasBig(
 const getAmountSign = (d: Decimal) =>
     d.isZero() ? 'zero' : d.isPositive() ? 'positive' : 'negative';
 
-/** Return non-zero amounts sorted by |value| desc (bigger → smaller). Tie-breaker: currency ASC */
+/** Non-zero amounts sorted by |value| desc (bigger → smaller). Tie-break: currency ASC */
 const getNonZeroAmounts = (acc: AccWithBig) => {
-    assertHasBig(acc); // narrow here (or at call site)
+    assertHasBig(acc);
     return Object.entries(acc.amountsBigInt)
         .filter(([_, d]) => !d.isZero())
         .map(([currency, value]) => ({ currency, value }))
@@ -60,40 +60,34 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     assertHasBig(account);
 
     const isLiquidoNode = norm((account.account || '').split(':')[0]) === 'liquido';
-
     const [isExpanded, setIsExpanded] = React.useState<boolean>(!isLiquidoNode);
     const accountPath = account.fullPath || account.account;
     const hasChildren = !!account.children?.length;
     const isSelected = selectedAccount === accountPath;
 
-    // already sorted by |amount| desc
     const amounts = getNonZeroAmounts(account);
+    const lastClearedDate = account.lastClearedDate || '';
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         onSelect?.(accountPath, !hasChildren);
     };
-
     const handleToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setIsExpanded(!isExpanded);
+        setIsExpanded((v) => !v);
     };
-
-    const lastClearedDate = account.lastClearedDate || '';
 
     const renderCurrencyRow = (
         { currency, value }: { currency: string; value: Decimal },
         isFirst: boolean
     ) => {
         const sign = getAmountSign(value);
+        const cleared = account.clearedAmountsBigInt?.[currency] ?? null;
+
         return (
-            <div
-            key={currency}
-            className={`relative grid grid-cols-4 gap-4 items-center py-2`}
-                >
-                {isFirst && (
-                    <div className="absolute inset-x-0 -top-px h-[1px] bg-gray-300" />
-                )}
+            <div key={currency} className="relative grid grid-cols-5 gap-4 items-center py-2">
+                {isFirst && <div className="absolute inset-x-0 -top-px h-[1px] bg-gray-300" />}
+            {/* Account / toggle */}
                 <div
             className="flex items-center"
             style={{ paddingLeft: `${level * 20 + (level > 0 ? 20 : 0)}px` }}
@@ -102,12 +96,12 @@ const AccountNode: React.FC<AccountNodeProps> = ({
                     <button
                     onClick={handleToggle}
                     className="p-1 hover:bg-blue-100 rounded-full mr-2 border border-transparent hover:border-blue-200"
-                    >
-                    {isExpanded ? (
-                        <ChevronDown size={14} className="text-gray-700" />
-                    ) : (
-                        <ChevronRight size={14} className="text-gray-700" />
-                    )}
+                        >
+                        {isExpanded ? (
+                            <ChevronDown size={14} className="text-gray-700" />
+                        ) : (
+                            <ChevronRight size={14} className="text-gray-700" />
+                        )}
                     </button>
                 )}
             {isFirst && (
@@ -133,10 +127,16 @@ level === 0
                 </>
             )}
             </div>
-                <div className={`text-sm ${level === 0 ? 'text-gray-600' : 'text-gray-500'}`}>
-                {isFirst ? lastClearedDate : ''}
+
+                {/* Last Cleared Date (only on first row) */}
+                <div className={`text-sm ${isFirst ? (level === 0 ? 'text-gray-600' : 'text-gray-500') : 'text-transparent'}`}>
+                {isFirst ? lastClearedDate : '—'}
             </div>
+
+                {/* Currency */}
                 <div className="text-right text-xs text-gray-500 font-medium">{currency}</div>
+
+                {/* Amount (current) */}
                 <div
             className={`font-mono text-right font-semibold ${
 sign === 'positive'
@@ -147,6 +147,11 @@ sign === 'positive'
 }`}
                 >
                 {formatDecimalByCommodity(currency, value)}
+            </div>
+
+                {/* Cleared amount (optional) */}
+                <div className="font-mono text-right font-semibold text-slate-600">
+                {cleared ? formatDecimalByCommodity(currency, cleared) : '—'}
             </div>
                 </div>
         );
@@ -162,10 +167,10 @@ isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500 shadow-sm' : 'hover:bg-gra
             >
             {amounts.map((a, i) => renderCurrencyRow(a, i === 0))}
         </div>
+
             {isExpanded && hasChildren && (
                 <div>
                     {account.children!.map((child, i) => {
-                        // Assert each child as we recurse
                         const childAcc = child as AccWithBig;
                         assertHasBig(childAcc);
                         return (
@@ -201,9 +206,9 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
                     .sort((x, y) => {
                         const xIsLiquido = norm(x.account) === 'liquido';
                         const yIsLiquido = norm(y.account) === 'liquido';
-                        if (xIsLiquido && !yIsLiquido) return 1;  // "Líquido" goes last
-                        if (!xIsLiquido && yIsLiquido) return -1; // "Líquido" goes last
-                        return x.account.localeCompare(y.account); // normal alphabetical otherwise
+                        if (xIsLiquido && !yIsLiquido) return 1;
+                        if (!xIsLiquido && yIsLiquido) return -1;
+                        return x.account.localeCompare(y.account);
                     }),
             };
         };
@@ -221,15 +226,17 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="grid grid-cols-4 gap-4 bg-gray-50 px-4 py-3 border-b font-semibold text-sm text-gray-700">
+            {/* updated header: + Cleared */}
+            <div className="grid grid-cols-5 gap-4 bg-gray-50 px-4 py-3 border-b font-semibold text-sm text-gray-700">
             <div>Account</div>
             <div>Last Cleared</div>
             <div className="text-right">Currency</div>
             <div className="text-right">Amount</div>
+            <div className="text-right">Cleared</div>
             </div>
+
             <div className="divide-y divide-gray-100">
             {sortedAccounts.map((acc, i) => {
-                // Optional: assert here too if you want an earlier failure
                 assertHasBig(acc);
                 return (
                     <AccountNode
