@@ -23,7 +23,7 @@ interface AccountNodeProps {
 function assertHasBig(
     acc: AccWithBig
 ): asserts acc is LedgerAccount & { amountsBigInt: Record<string, Decimal>, clearedAmountsBigInt: Record<string, Decimal> } {
-    if (!acc.amountsBigInt) {
+    if (!acc.amountsBigInt || !acc.clearedAmountsBigInt) {
         throw new Error('amountsBigInt is missing. Ensure withBigInts() was applied before rendering.');
     }
 }
