@@ -189,6 +189,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
             )}
         {hidden.size > 0 && (
             <button
+            type="button"
             onClick={resetFilters}
             className="ml-2 rounded px-2 py-1 border border-gray-300 text-gray-700 hover:bg-gray-50"
             title="Show all again"
@@ -253,6 +254,7 @@ export const ExpensePieChart: React.FC<ExpensePieChartProps> = ({
 
                         return (
                             <button
+                            type="button"
                             key={expense.account}
                             onClick={() => toggleAccount(expense.account)}
                             className={`w-full flex items-center justify-between py-2 px-3 rounded transition ${
@@ -330,7 +332,7 @@ expense.isOthers ? 'text-gray-600' : 'text-red-600'
         {nothingVisible && (
             <div className="mt-6 text-center text-sm text-gray-500">
                 All categories are hidden.{' '}
-                <button onClick={resetFilters} className="underline hover:no-underline" title="Show all again">
+                <button type="button" onClick={resetFilters} className="underline hover:no-underline" title="Show all again">
                 Reset filters
             </button>
                 </div>

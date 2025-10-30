@@ -37,7 +37,7 @@ export const Controls: React.FC<ControlsProps> = ({
 
     useEffect(() => {
         onPeriodChange(dateFrom || null, dateTo || null);
-    }, [dateFrom, dateTo, onPeriodChange]);
+    }, [dateFrom, dateTo]);
 
     const applyRange = (from: string, to: string) => {
         setDateFrom(from);
@@ -118,6 +118,7 @@ export const Controls: React.FC<ControlsProps> = ({
             {/*
             <div className="flex gap-2">
             <button
+            type="button"
         onClick={applyIfReady}
         disabled={!(dateFrom && dateTo)}
         className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
@@ -127,6 +128,7 @@ export const Controls: React.FC<ControlsProps> = ({
             </button>
             {(dateFrom || dateTo) && (
                 <button
+                type="button"
                 onClick={clearRange}
                 className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
                     >
@@ -157,6 +159,7 @@ export const Controls: React.FC<ControlsProps> = ({
         placeholder="Account name..."
             />
             <button
+        type="button"
         onClick={handleAccountSearch}
         disabled={!searchAccount.trim()}
         className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
@@ -172,6 +175,7 @@ export const Controls: React.FC<ControlsProps> = ({
             Actions
         </label>
             <button
+        type="button"
         onClick={onRefresh}
         disabled={isLoading}
         className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
@@ -187,24 +191,28 @@ export const Controls: React.FC<ControlsProps> = ({
             <div className="flex flex-wrap gap-2 items-center">
             <span className="text-sm font-medium text-gray-700 mr-2">Quick Period:</span>
             <button
+        type="button"
         onClick={setThisYear}
         className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
             >
             This Year
         </button>
             <button
+        type="button"
         onClick={setThisMonth}
         className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
             >
             This Month
         </button>
             <button
+        type="button"
         onClick={setLastMonth}
         className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
             >
             Last Month
         </button>
             <button
+        type="button"
         onClick={clearRange}
         className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
             >
@@ -218,30 +226,35 @@ export const Controls: React.FC<ControlsProps> = ({
             <div className="flex flex-wrap gap-2">
             <span className="text-sm font-medium text-gray-700 mr-2">Quick Filters:</span>
             <button
+        type="button"
         onClick={() => onCommandChange('bal Ativos')}
         className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
             >
             Ativos
         </button>
             <button
+        type="button"
         onClick={() => onCommandChange('bal Passivo')}
         className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors"
             >
             Passivos
         </button>
             <button
+        type="button"
         onClick={() => onCommandChange('bal Receitas')}
         className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors"
             >
             Receitas
         </button>
             <button
+        type="button"
         onClick={() => onCommandChange('bal Despesas')}
         className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full hover:bg-yellow-200 transition-colors"
             >
             Despesas
         </button>
             <button
+        type="button"
         onClick={() => onCommandChange('bal')}
         className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
             >

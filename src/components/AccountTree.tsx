@@ -94,6 +94,7 @@ const AccountNode: React.FC<AccountNodeProps> = ({
                 >
                 {isFirst && hasChildren && (
                     <button
+                    type="button"
                     onClick={handleToggle}
                     className="p-1 hover:bg-blue-100 rounded-full mr-2 border border-transparent hover:border-blue-200"
                         >

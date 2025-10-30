@@ -136,6 +136,7 @@ const CashFlowTreeNodeComponent: React.FC<{
                     <div className="flex items-center">
                         {hasChildren && (
                             <button
+                            type="button"
                                 onClick={handleToggle}
                                 className="p-1 hover:bg-gray-200 rounded transition-colors mr-2"
                             >
@@ -285,6 +286,7 @@ export default function CashFlowView({ subtotals, currency }: CashFlowViewProps)
                 <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
                     <h2 className="text-lg font-semibold text-gray-800">Cash Flow Details</h2>
                     <button
+        type="button"
                         onClick={handleExpandAll}
                         className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
                     >

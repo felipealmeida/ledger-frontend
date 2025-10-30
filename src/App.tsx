@@ -188,11 +188,11 @@ function App() {
     };
 
     const toggleExpenseChart = () => {
-        setShowExpenseChart((v) => !v);
         setShowExpenseDiff(false);
         setShowBudget(false);
         setSelectedAccount('');
         setTransactionData(null);
+        setShowExpenseChart(true);
     };
 
     const toggleBudgetView = () => {
@@ -384,6 +384,7 @@ function App() {
             <div className="mt-4 flex flex-wrap gap-3 justify-center">
                 {/* Budget Toggle */}
                 <button
+            type="button"
             onClick={toggleBudgetView}
             className={`flex items-center space-x-2 px-6 py-2 rounded-md transition-colors ${
 showBudget
@@ -398,6 +399,7 @@ showBudget
                 {/* Expense Chart Toggle */}
             {data && !showBudget && (
                 <button
+                type="button"
                 onClick={toggleExpenseChart}
                 className={`flex items-center space-x-2 px-6 py-2 rounded-md transition-colors ${
 showExpenseChart
@@ -413,6 +415,7 @@ showExpenseChart
             {/* Compare Months Toggle */}
             {data && !showBudget && (
                 <button
+                type="button"
                 onClick={() => {
                     setShowExpenseDiff((prev) => !prev);
                     setShowExpenseChart(false);
@@ -480,6 +483,7 @@ showExpenseDiff
 
                 <div className="md:col-span-2 flex items-end">
                 <button
+            type="button"
             onClick={loadCompareData}
             className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
                 >
@@ -596,6 +600,7 @@ showExpenseDiff
                 {selectedAccount && (
                     <div className="mt-6 text-center">
                         <button
+                    type="button"
                     onClick={() => {
                         setSelectedAccount('');
                         loadData();
@@ -666,6 +671,7 @@ tx.runningBalance > 0 ? 'text-green-600' : 'text-red-600'
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Welcome to Ledger Dashboard</h3>
                 <p className="text-gray-600 mb-4">Click refresh to load your ledger data</p>
                 <button
+            type="button"
             onClick={loadData}
             className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
                 >
