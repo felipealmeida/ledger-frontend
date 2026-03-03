@@ -15,34 +15,27 @@ interface AccountNodeProps {
     onSelect?: (account: string, showTransactions?: boolean) => void;
     selectedAccount?: string;
     level?: number;
-    isLastChild?: boolean;
-    parentConnections?: boolean[];
 }
 
-/** Assert amountsBigInt exists; cleared is optional */
 function assertHasBig(
     acc: AccWithBig
 ): asserts acc is LedgerAccount & { amountsBigInt: Record<string, Decimal>, clearedAmountsBigInt: Record<string, Decimal> } {
     if (!acc.amountsBigInt || !acc.clearedAmountsBigInt) {
-        throw new Error('amountsBigInt is missing. Ensure withBigInts() was applied before rendering.');
+        throw new Error('amountsBigInt is missing');
     }
 }
 
 const getAmountSign = (d: Decimal) =>
     d.isZero() ? 'zero' : d.isPositive() ? 'positive' : 'negative';
 
-/** Non-zero amounts sorted by |value| desc (bigger → smaller). Tie-break: currency ASC */
 const getNonZeroAmounts = (acc: AccWithBig) => {
     assertHasBig(acc);
     return Object.entries(acc.amountsBigInt)
         .filter(([_, d]) => !d.isZero())
         .map(([currency, value]) => ({ currency, value }))
         .sort((a, b) => {
-            const av = a.value.abs();
-            const bv = b.value.abs();
-            if (bv.gt(av)) return 1;
-            if (bv.lt(av)) return -1;
-            return a.currency.localeCompare(b.currency);
+            const cmp = b.value.abs().comparedTo(a.value.abs());
+            return cmp !== 0 ? cmp : a.currency.localeCompare(b.currency);
         });
 };
 
@@ -54,8 +47,6 @@ const AccountNode: React.FC<AccountNodeProps> = ({
     onSelect,
     selectedAccount,
     level = 0,
-    isLastChild = false,
-    parentConnections = [],
 }) => {
     assertHasBig(account);
 
@@ -77,97 +68,78 @@ const AccountNode: React.FC<AccountNodeProps> = ({
         setIsExpanded((v) => !v);
     };
 
-    const renderCurrencyRow = (
-        { currency, value }: { currency: string; value: Decimal },
-        isFirst: boolean
-    ) => {
-        const sign = getAmountSign(value);
-        const cleared = account.clearedAmountsBigInt?.[currency] ?? null;
-
-        return (
-            <div key={currency} className="relative grid grid-cols-5 gap-4 items-center py-2">
-                {isFirst && <div className="absolute inset-x-0 -top-px h-[1px] bg-gray-300" />}
-            {/* Account / toggle */}
-                <div
-            className="flex items-center"
-            style={{ paddingLeft: `${level * 20 + (level > 0 ? 20 : 0)}px` }}
-                >
-                {isFirst && hasChildren && (
-                    <button
-                    type="button"
-                    onClick={handleToggle}
-                    className="p-1 hover:bg-blue-100 rounded-full mr-2 border border-transparent hover:border-blue-200"
-                        >
-                        {isExpanded ? (
-                            <ChevronDown size={14} className="text-gray-700" />
-                        ) : (
-                            <ChevronRight size={14} className="text-gray-700" />
-                        )}
-                    </button>
-                )}
-            {isFirst && (
-                <>
-                    <span className="mr-2 inline-block h-3 w-0.5 bg-gray-300 rounded" aria-hidden />
-                    <span
-                className={`font-medium ${
-level === 0
-? 'text-gray-900 font-semibold'
-: level === 1
-? 'text-gray-800'
-: 'text-gray-700'
-}`}
-                style={{ fontSize: level === 0 ? '0.95rem' : '0.875rem' }}
-                    >
-                    {account.account}
-                </span>
-                    {hasChildren && (
-                        <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                            {account.children?.length}
-                        </span>
-                    )}
-                </>
-            )}
-            </div>
-
-                {/* Last Cleared Date (only on first row) */}
-                <div className={`text-sm ${isFirst ? (level === 0 ? 'text-gray-600' : 'text-gray-500') : 'text-transparent'}`}>
-                {isFirst ? lastClearedDate : '—'}
-            </div>
-
-                {/* Currency */}
-                <div className="text-right text-xs text-gray-500 font-medium">{currency}</div>
-
-                {/* Amount (current) */}
-                <div
-            className={`font-mono text-right font-semibold ${
-sign === 'positive'
-? 'text-green-600'
-: sign === 'negative'
-? 'text-red-600'
-: 'text-gray-600'
-}`}
-                >
-                {formatDecimalByCommodity(currency, value)}
-            </div>
-
-                {/* Cleared amount (optional) */}
-                <div className="font-mono text-right font-semibold text-slate-600">
-                {cleared ? formatDecimalByCommodity(currency, cleared) : '—'}
-            </div>
-                </div>
-        );
-    };
-
     return (
         <div>
             <div
-        className={`relative border-b cursor-pointer transition-all duration-200 ${
-isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500 shadow-sm' : 'hover:bg-gray-50 hover:shadow-sm'
-}`}
-        onClick={handleClick}
+                className={`border-b cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'
+                }`}
+                onClick={handleClick}
             >
-            {amounts.map((a, i) => renderCurrencyRow(a, i === 0))}
-        </div>
+                {amounts.map(({ currency, value }, i) => {
+                    const sign = getAmountSign(value);
+                    const cleared = account.clearedAmountsBigInt?.[currency] ?? null;
+                    const isFirst = i === 0;
+
+                    return (
+                        <div key={currency} className="grid grid-cols-[1fr_auto_auto_auto] sm:grid-cols-[1fr_100px_80px_120px_120px] gap-2 sm:gap-4 items-center py-1.5 px-2 sm:px-4">
+                            {/* Account name */}
+                            <div
+                                className="flex items-center min-w-0"
+                                style={{ paddingLeft: `${level * 16 + (level > 0 ? 12 : 0)}px` }}
+                            >
+                                {isFirst && hasChildren && (
+                                    <button
+                                        type="button"
+                                        onClick={handleToggle}
+                                        className="p-0.5 hover:bg-blue-100 rounded mr-1.5 flex-shrink-0"
+                                    >
+                                        {isExpanded ? (
+                                            <ChevronDown size={14} className="text-gray-600" />
+                                        ) : (
+                                            <ChevronRight size={14} className="text-gray-600" />
+                                        )}
+                                    </button>
+                                )}
+                                {isFirst && (
+                                    <span
+                                        className={`truncate ${
+                                            level === 0 ? 'font-semibold text-gray-900 text-sm' : 'text-gray-700 text-sm'
+                                        }`}
+                                    >
+                                        {account.account}
+                                        {hasChildren && (
+                                            <span className="ml-1.5 text-xs text-gray-400">
+                                                ({account.children?.length})
+                                            </span>
+                                        )}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Last Cleared Date — hidden on mobile */}
+                            <div className={`hidden sm:block text-xs ${isFirst ? 'text-gray-500' : 'text-transparent'}`}>
+                                {isFirst ? lastClearedDate : ''}
+                            </div>
+
+                            {/* Currency */}
+                            <div className="text-right text-xs text-gray-400 font-medium">{currency}</div>
+
+                            {/* Amount */}
+                            <div className={`font-mono text-right text-sm font-semibold ${
+                                sign === 'positive' ? 'text-green-600' : sign === 'negative' ? 'text-red-600' : 'text-gray-500'
+                            }`}>
+                                {formatDecimalByCommodity(currency, value)}
+                            </div>
+
+                            {/* Cleared — hidden on mobile */}
+                            <div className="hidden sm:block font-mono text-right text-sm text-slate-500">
+                                {cleared ? formatDecimalByCommodity(currency, cleared) : '—'}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
 
             {isExpanded && hasChildren && (
                 <div>
@@ -176,14 +148,12 @@ isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500 shadow-sm' : 'hover:bg-gra
                         assertHasBig(childAcc);
                         return (
                             <AccountNode
-                            key={childAcc.fullPath || childAcc.account}
-                            account={childAcc}
-                            onSelect={onSelect}
-                            selectedAccount={selectedAccount}
-                            level={level + 1}
-                            isLastChild={i === account.children!.length - 1}
-                            parentConnections={parentConnections}
-                                />
+                                key={childAcc.fullPath || childAcc.account}
+                                account={childAcc}
+                                onSelect={onSelect}
+                                selectedAccount={selectedAccount}
+                                level={level + 1}
+                            />
                         );
                     })}
                 </div>
@@ -227,31 +197,29 @@ export const AccountTree: React.FC<AccountTreeProps> = ({
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            {/* updated header: + Cleared */}
-            <div className="grid grid-cols-5 gap-4 bg-gray-50 px-4 py-3 border-b font-semibold text-sm text-gray-700">
-            <div>Account</div>
-            <div>Last Cleared</div>
-            <div className="text-right">Currency</div>
-            <div className="text-right">Amount</div>
-            <div className="text-right">Cleared</div>
+            {/* Header */}
+            <div className="grid grid-cols-[1fr_auto_auto_auto] sm:grid-cols-[1fr_100px_80px_120px_120px] gap-2 sm:gap-4 bg-gray-50 px-2 sm:px-4 py-2.5 border-b font-semibold text-xs text-gray-600 uppercase tracking-wider">
+                <div>Conta</div>
+                <div className="hidden sm:block">Últ. Conciliação</div>
+                <div className="text-right">Moeda</div>
+                <div className="text-right">Saldo</div>
+                <div className="hidden sm:block text-right">Conciliado</div>
             </div>
 
-            <div className="divide-y divide-gray-100">
-            {sortedAccounts.map((acc, i) => {
-                assertHasBig(acc);
-                return (
-                    <AccountNode
-                    key={acc.fullPath || acc.account}
-                    account={acc}
-                    onSelect={onAccountSelect}
-                    selectedAccount={selectedAccount}
-                    level={0}
-                    isLastChild={i === sortedAccounts.length - 1}
-                    parentConnections={[]}
+            <div>
+                {sortedAccounts.map((acc) => {
+                    assertHasBig(acc);
+                    return (
+                        <AccountNode
+                            key={acc.fullPath || acc.account}
+                            account={acc}
+                            onSelect={onAccountSelect}
+                            selectedAccount={selectedAccount}
+                            level={0}
                         />
-                );
-            })}
-        </div>
+                    );
+                })}
             </div>
+        </div>
     );
 };
