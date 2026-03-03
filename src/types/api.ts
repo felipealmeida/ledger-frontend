@@ -112,3 +112,36 @@ export interface BudgetResponse {
     timestamp: string;
 }
 
+export interface Price {
+    what: string;
+    amounts: Record<string, string>;
+    is_commodity: boolean;
+}
+
+function attachBigIntsToPrice(
+  prices: Price[]
+): (Price & { amountsBigInt: BigAmountsMap })[] {
+  return prices.map(price => ({
+    ...price,
+    amountsBigInt: Object.fromEntries(
+      Object.entries(price.amounts).map(([currency, value]) => [
+        currency,
+        new Decimal(value),
+      ])
+    ),
+  }));
+}
+
+export interface LedgerPriceResponse {
+    prices: Price[];
+    timestamp: string;
+}
+
+export function withBigIntsPrices(
+  res: LedgerPriceResponse
+): LedgerPriceResponse & { prices: ReturnType<typeof attachBigIntsToPrice> } {
+  return {
+    ...res,
+    prices: attachBigIntsToPrice(res.prices),
+  };
+}

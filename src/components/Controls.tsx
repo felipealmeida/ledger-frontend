@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Activity, Calendar } from 'lucide-react';
+import { Price, } from '../types/api';
 
 interface ControlsProps {
     onRefresh: () => void;
@@ -9,6 +10,7 @@ interface ControlsProps {
     isLoading: boolean;
     currentCommand: string;
     currentPeriod: string; // still accepted; shown as the “effective” value if no range is set
+    prices?: Price[] | null;
 }
 
 export const Controls: React.FC<ControlsProps> = ({
@@ -19,6 +21,7 @@ export const Controls: React.FC<ControlsProps> = ({
     isLoading,
     currentCommand,
     currentPeriod,
+    prices,
 }) => {
     const [searchAccount, setSearchAccount] = useState('');
     const [dateFrom, setDateFrom] = useState<string | null>(null);

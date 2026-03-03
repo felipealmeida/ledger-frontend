@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, BudgetResponse, withBigInts } from '../types/api';
+import { LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, BudgetResponse, withBigInts,
+         LedgerPriceResponse, withBigIntsPrices } from '../types/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -98,5 +99,10 @@ export class LedgerApiService {
             console.error('Failed to fetch budget report:', error);
             throw error;
         }
+    }
+
+    static async getPrices(): Promise<LedgerPriceResponse> {
+        const response = await api.get(`api/prices`);
+        return withBigIntsPrices(response.data);
     }
 }

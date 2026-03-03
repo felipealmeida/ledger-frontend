@@ -7,6 +7,7 @@ import {
     HealthResponse,
     TransactionData,
     BudgetResponse,
+    LedgerPriceResponse,
     AccWithBig,
 } from './types/api';
 import { AccountTree } from './components/AccountTree';
@@ -19,6 +20,7 @@ import CashFlowView from './components/CashFlowView';
 import BudgetVisualization from './components/BudgetVisualization';
 import { AlertCircle, CheckCircle, Clock, BarChart3, TrendingDown, Target } from 'lucide-react';
 import Decimal from 'decimal.js';
+import { formatDecimalByCommodity } from './components/FormatDecimal';
 
 type PieExpense = { account: string; amount: Decimal };
 
@@ -41,10 +43,12 @@ function App() {
 
     const [transactionData, setTransactionData] = useState<TransactionData | null>(null);
     const [cashFlowData, setCashFlowData] = useState<LedgerSubTotalsResponse | null>(null);
+    const [prices, setPrices] = useState<LedgerPriceResponse | null>(null);
     
     // Budget state
     const [budgetData, setBudgetData] = useState<BudgetResponse | null>(null);
     const [showBudget, setShowBudget] = useState(false);
+    const [showPrices, setShowPrices] = useState(true);
 
     // Compare Months state
     const [showExpenseDiff, setShowExpenseDiff] = useState(false);
@@ -86,6 +90,9 @@ function App() {
                 setCashFlowData(null);
                 setTransactionData(null);
                 setBudgetData(null);
+
+                const prices = await LedgerApiService.getPrices();
+                setPrices(prices);
             }
         } catch (err: any) {
             setError(err.response?.data?.error || err.message || 'Failed to load data');
@@ -176,6 +183,7 @@ function App() {
         setSelectedAccount('');
         setShowExpenseChart(false);
         setShowExpenseDiff(false);
+        setShowPrices(false);
         setShowBudget(false);
     };
 
@@ -184,11 +192,13 @@ function App() {
         setSelectedAccount('');
         setShowExpenseChart(false);
         setShowExpenseDiff(false);
+        setShowPrices(false);
         setShowBudget(false);
     };
 
     const toggleExpenseChart = () => {
         setShowExpenseDiff(false);
+        setShowPrices(false);
         setShowBudget(false);
         setSelectedAccount('');
         setTransactionData(null);
@@ -199,7 +209,20 @@ function App() {
         if (!showBudget) {
             loadBudgetData();
         }
+        setShowPrices(false);
         setShowBudget((v) => !v);
+        setShowExpenseChart(false);
+        setShowExpenseDiff(false);
+        setSelectedAccount('');
+        setTransactionData(null);
+    };
+
+    const togglePricesView = () => {
+        if (!showPrices) {
+            //loadBudgetData();
+        }
+        setShowPrices((v) => !v);
+        setShowBudget(false);
         setShowExpenseChart(false);
         setShowExpenseDiff(false);
         setSelectedAccount('');
@@ -377,6 +400,7 @@ function App() {
         isLoading={isLoading}
         currentCommand={currentCommand}
         currentPeriod={currentPeriod}
+        prices={prices?.prices}
             />
 
             {/* Action Buttons Row */}
@@ -432,6 +456,22 @@ showExpenseDiff
                     <span>{showExpenseDiff ? 'Hide Month Comparison' : 'Compare Months'}</span>
                     </button>
             )}
+
+            {(
+                <button
+                type="button"
+                onClick={togglePricesView}
+                className={`flex items-center space-x-2 px-6 py-2 rounded-md transition-colors ${
+showExpenseChart
+? 'bg-red-500 text-white hover:bg-red-600'
+: 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+}`}
+                    >
+                    <TrendingDown className="h-5 w-5" />
+                    <span>{showPrices ? 'Show Prices' : 'Hide Prices'}</span>
+                    </button>
+            )}
+
             </div>
         )}
         </div>
@@ -518,6 +558,42 @@ showExpenseDiff
         {/* Budget View */}
         {budgetData && showBudget && !isLoading && (
             <BudgetVisualization budgetData={budgetData} />
+        )}
+
+        {!prices || !prices.prices || prices.prices.length <= 0 && (
+            <p>Failing prices</p>
+        )}
+        {//showPrices && prices && prices.prices && prices.prices.length > 0 && (
+            (
+            <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Latest prices</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {prices && prices.prices && prices?.prices?.map((p) => (
+                    <div key={p.what} className="border rounded-md p-3">
+                        <div className="flex items-center justify-between">
+                        <span className="font-medium">{p.what}</span>
+                        <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+p.is_commodity ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'
+}`}
+                        >
+                    </span>
+                        </div>
+
+                        <div className="mt-2 space-y-0.5 text-sm font-mono">
+                        {Object.entries(p.amounts).map(([commodity, value]) => (
+                            <div key={commodity}>
+                                {formatDecimalByCommodity(commodity, new Decimal(value))}
+                            </div>
+                        ))}
+                    </div>
+                        </div>
+                ))}
+            </div>
+                </div>
         )}
 
         {/* Content */}
