@@ -25,8 +25,13 @@ RUN npm run build
 # Production stage with Nginx
 FROM nginx:alpine AS production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and apache2-utils (for htpasswd)
+RUN apk add --no-cache dumb-init apache2-utils
+
+# Generate .htpasswd from build args
+ARG AUTH_USER=admin
+ARG AUTH_PASSWORD=changeme
+RUN htpasswd -cb /etc/nginx/.htpasswd "$AUTH_USER" "$AUTH_PASSWORD"
 
 # Copy custom nginx configuration
 COPY <<EOF /etc/nginx/conf.d/default.conf
@@ -35,6 +40,10 @@ server {
     server_name localhost;
     root /usr/share/nginx/html;
     index index.html;
+
+    # Basic auth
+    auth_basic "Restricted";
+    auth_basic_user_file /etc/nginx/.htpasswd;
 
     # Gzip compression
     gzip on;
@@ -45,7 +54,7 @@ server {
     # Handle client-side routing
     location / {
         try_files \$uri \$uri/ /index.html;
-        
+
         # Security headers
         add_header X-Frame-Options "SAMEORIGIN" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -60,8 +69,9 @@ server {
         access_log off;
     }
 
-    # Health check endpoint
+    # Health check endpoint (no auth)
     location /health {
+        auth_basic off;
         access_log off;
         return 200 "healthy\n";
         add_header Content-Type text/plain;
