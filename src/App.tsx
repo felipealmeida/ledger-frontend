@@ -6,6 +6,7 @@ import { BalancePage } from './pages/BalancePage';
 import { ExpensesPage } from './pages/ExpensesPage';
 import { BudgetPage } from './pages/BudgetPage';
 import { CashFlowPage } from './pages/CashFlowPage';
+import ImportPage from './pages/ImportPage';
 
 function App() {
     return (
@@ -16,6 +17,7 @@ function App() {
                 <Route path="/despesas" element={<ExpensesPage />} />
                 <Route path="/orcamento" element={<BudgetPage />} />
                 <Route path="/fluxo" element={<CashFlowPage />} />
+                <Route path="/importar" element={<ImportPage />} />
             </Route>
         </Routes>
     );

@@ -11,6 +11,7 @@ const pageTitles: Record<string, string> = {
     '/despesas': 'Despesas',
     '/orcamento': 'Orçamento',
     '/fluxo': 'Fluxo de Caixa',
+    '/importar': 'Importar Fatura',
 };
 
 export const DashboardLayout: React.FC = () => {

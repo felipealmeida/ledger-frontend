@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-    LayoutDashboard, Landmark, Receipt, Target, ArrowLeftRight, X, Activity
+    LayoutDashboard, Landmark, Receipt, Target, ArrowLeftRight, X, Activity, Upload
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,6 +16,7 @@ const navItems = [
     { to: '/despesas', label: 'Despesas', icon: Receipt },
     { to: '/orcamento', label: 'Orçamento', icon: Target },
     { to: '/fluxo', label: 'Fluxo de Caixa', icon: ArrowLeftRight },
+    { to: '/importar', label: 'Importar', icon: Upload },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isConnected }) => {
