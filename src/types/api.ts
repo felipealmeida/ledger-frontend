@@ -131,3 +131,71 @@ export function withBigIntsPrices(
     prices: attachBigIntsToPrice(res.prices),
   };
 }
+
+// Import feature types
+
+export interface Importer {
+  key: string;
+  label: string;
+}
+
+export interface ImportableAccount {
+  account: string;
+  import_file: string;
+  importers: Importer[];
+}
+
+export interface Posting {
+  account: string;
+  amount?: number | null;
+  commodity?: string;
+  status?: string;
+  date_tag?: string | null;
+}
+
+export interface ImportTransaction {
+  date: string;
+  description: string;
+  skip: boolean;
+  skip_reason?: string | null;
+  postings: Posting[];
+  selected?: boolean;
+}
+
+export interface ImportAccountsResponse {
+  accounts: ImportableAccount[];
+}
+
+export interface ParseResponse {
+  account: string;
+  parser: string;
+  period: string;
+  transaction_count: number;
+  transactions: ImportTransaction[];
+}
+
+export interface ImportCategoriesResponse {
+  categories: string[];
+}
+
+export interface RecentMapping {
+  description: string;
+  account: string;
+}
+
+export interface RecentTransactionsResponse {
+  account: string;
+  mappings: RecentMapping[];
+}
+
+export interface AppendRequest {
+  file: string;
+  transactions: ImportTransaction[];
+}
+
+export interface AppendResponse {
+  success: boolean;
+  file: string;
+  count: number;
+  preview: string;
+}
