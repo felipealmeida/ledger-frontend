@@ -1,7 +1,9 @@
 import axios from 'axios';
 import {
     LedgerBalanceResponse, LedgerSubTotalsResponse, HealthResponse, BudgetResponse,
-    withBigInts, LedgerPriceResponse, withBigIntsPrices
+    withBigInts, LedgerPriceResponse, withBigIntsPrices,
+    ImportAccountsResponse, ParseResponse, ImportCategoriesResponse,
+    RecentTransactionsResponse, AppendRequest, AppendResponse,
 } from '../types/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
@@ -56,5 +58,53 @@ export class LedgerApiService {
     static async getPrices(): Promise<LedgerPriceResponse> {
         const response = await api.get<LedgerPriceResponse>('api/prices');
         return withBigIntsPrices(response.data);
+    }
+
+    // ── Import endpoints ────────────────────────────────────────────────
+
+    static async getImportAccounts(): Promise<ImportAccountsResponse> {
+        const response = await api.get<ImportAccountsResponse>('/api/import/accounts');
+        return response.data;
+    }
+
+    static async parseStatement(
+        file: File,
+        account: string,
+        parser: string,
+        year?: string,
+    ): Promise<ParseResponse> {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('account', account);
+        formData.append('parser', parser);
+        if (year) formData.append('year', year);
+        const response = await api.post<ParseResponse>('/api/import/parse', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 120000,
+        });
+        return response.data;
+    }
+
+    static async getImportCategories(): Promise<ImportCategoriesResponse> {
+        const response = await api.get<ImportCategoriesResponse>('/api/import/categories');
+        return response.data;
+    }
+
+    static async getRecentTransactions(
+        account: string,
+        limit?: number,
+    ): Promise<RecentTransactionsResponse> {
+        const params = new URLSearchParams();
+        params.append('account', account);
+        if (limit) params.append('limit', limit.toString());
+        const response = await api.get<RecentTransactionsResponse>(
+            `/api/import/recent?${params}`
+        );
+        return response.data;
+    }
+
+    static async appendTransactions(body: AppendRequest): Promise<AppendResponse> {
+        const response = await api.post<AppendResponse>('/api/import/append', body);
+        return response.data;
     }
 }
