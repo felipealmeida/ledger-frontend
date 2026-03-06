@@ -62,20 +62,6 @@ export interface ApiError {
     details?: any;
 }
 
-export interface TransactionData {
-    transactions: Transaction[];
-    account: string;
-    period?: string;
-    timestamp: string;
-}
-
-export interface Transaction {
-    date: string;
-    description: string;
-    amount: number;
-    runningBalance: number;
-}
-
 export interface LedgerSubTotalNode {
     description: string;
     inflow_amount: number;

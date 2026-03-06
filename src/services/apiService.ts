@@ -13,15 +13,6 @@ const api = axios.create({
 
 export class LedgerApiService {
 
-    static async getAccountTransactions(account: string, period?: string): Promise<any> {
-        const params = new URLSearchParams();
-        if (period) params.append('period', period);
-        const response = await api.get(
-            `/api/transactions/${encodeURIComponent(account)}${params.toString() ? `?${params.toString()}` : ''}`
-        );
-        return response.data;
-    }
-
     static async getBalance(command: string, after: string | null, before: string | null): Promise<LedgerBalanceResponse> {
         const params = new URLSearchParams();
         if (after) params.append('after', after);
@@ -30,13 +21,6 @@ export class LedgerApiService {
             `/api/balance${params.toString() ? `?${params.toString()}` : ''}`
         );
         return withBigInts(response.data);
-    }
-
-    static async getAccountBalance(account: string, period?: string): Promise<LedgerBalanceResponse> {
-        const response = await api.get<LedgerBalanceResponse>(
-            `/api/balance/${encodeURIComponent(account)}`
-        );
-        return response.data;
     }
 
     static async getHealth(): Promise<HealthResponse> {

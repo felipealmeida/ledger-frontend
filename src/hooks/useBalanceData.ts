@@ -67,37 +67,7 @@ export function useBalanceData() {
         }
     }, []);
 
-    const loadAccount = useCallback(async (account: string) => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await LedgerApiService.getAccountBalance(account);
-            setData(response);
-            return response;
-        } catch (err: any) {
-            const msg = err.response?.data?.error || err.message || 'Falha ao carregar conta';
-            setError(msg);
-            return null;
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    const loadTransactions = useCallback(async (account: string, period?: string) => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            return await LedgerApiService.getAccountTransactions(account, period);
-        } catch (err: any) {
-            const msg = err.response?.data?.error || err.message || 'Falha ao carregar transações';
-            setError(msg);
-            return null;
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
     const expenses = extractExpensesFromBalance(data);
 
-    return { data, isLoading, error, load, loadAccount, loadTransactions, expenses, setData, setError };
+    return { data, isLoading, error, load, expenses, setData, setError };
 }
