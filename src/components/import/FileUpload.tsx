@@ -30,7 +30,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ accounts, onSubmit, isLo
       setSelectedAccount(account);
       const acct = accounts.find((a) => a.account === account);
       if (acct && acct.importers.length === 1) {
-        setSelectedParser(acct.importers[0].key);
+        setSelectedParser(acct.importers[0].parser);
       } else {
         setSelectedParser('');
       }
@@ -107,13 +107,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ accounts, onSubmit, isLo
         >
           {importers.length === 0 && <option value="">Selecione uma conta primeiro</option>}
           {importers.length === 1 && (
-            <option value={importers[0].key}>{importers[0].label}</option>
+            <option value={importers[0].parser}>{importers[0].label}</option>
           )}
           {importers.length > 1 && (
             <>
               <option value="">Selecione o formato...</option>
               {importers.map((imp) => (
-                <option key={imp.key} value={imp.key}>
+                <option key={imp.parser} value={imp.parser}>
                   {imp.label}
                 </option>
               ))}

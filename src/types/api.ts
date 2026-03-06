@@ -135,13 +135,13 @@ export function withBigIntsPrices(
 // Import feature types
 
 export interface Importer {
-  key: string;
+  parser: string;
   label: string;
 }
 
 export interface ImportableAccount {
   account: string;
-  import_file: string;
+  file: string;
   importers: Importer[];
 }
 
@@ -153,7 +153,7 @@ export interface Posting {
   date_tag?: string | null;
 }
 
-export interface ImportTransaction {
+export interface LedgerTransaction {
   date: string;
   description: string;
   skip: boolean;
@@ -168,10 +168,9 @@ export interface ImportAccountsResponse {
 
 export interface ParseResponse {
   account: string;
-  parser: string;
+  file: string;
   period: string;
-  transaction_count: number;
-  transactions: ImportTransaction[];
+  transactions: LedgerTransaction[];
 }
 
 export interface ImportCategoriesResponse {
@@ -190,7 +189,7 @@ export interface RecentTransactionsResponse {
 
 export interface AppendRequest {
   file: string;
-  transactions: ImportTransaction[];
+  transactions: LedgerTransaction[];
 }
 
 export interface AppendResponse {

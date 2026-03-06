@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
-import { ImportTransaction, Posting } from '../../types/api';
+import { LedgerTransaction, Posting } from '../../types/api';
 
 interface TransactionEditorProps {
-  transactions: ImportTransaction[];
+  transactions: LedgerTransaction[];
   categories: string[];
-  onUpdate: (transactions: ImportTransaction[]) => void;
-  onConfirm: (selected: ImportTransaction[]) => void;
+  onUpdate: (transactions: LedgerTransaction[]) => void;
+  onConfirm: (selected: LedgerTransaction[]) => void;
 }
 
 // ── Account Autocomplete ─────────────────────────────────────────────────
@@ -170,12 +170,12 @@ const PostingRow: React.FC<{
 
 // ── Transaction Card ─────────────────────────────────────────────────────
 const TransactionCard: React.FC<{
-  tx: ImportTransaction;
+  tx: LedgerTransaction;
   txIndex: number;
   categories: string[];
   selected: boolean;
   onToggleSelect: () => void;
-  onUpdate: (tx: ImportTransaction) => void;
+  onUpdate: (tx: LedgerTransaction) => void;
 }> = ({ tx, txIndex, categories, selected, onToggleSelect, onUpdate }) => {
   const isSkipped = tx.skip;
 
@@ -322,7 +322,7 @@ export const TransactionEditor: React.FC<TransactionEditorProps> = ({
   }, [transactions]);
 
   const handleTxUpdate = useCallback(
-    (idx: number, tx: ImportTransaction) => {
+    (idx: number, tx: LedgerTransaction) => {
       const next = [...transactions];
       next[idx] = tx;
       onUpdate(next);

@@ -4,7 +4,7 @@ import { FileUpload } from '../components/import/FileUpload';
 import { TransactionEditor } from '../components/import/TransactionEditor';
 import { LedgerPreview } from '../components/import/LedgerPreview';
 import { LedgerApiService } from '../services/apiService';
-import { ImportableAccount, ParseResponse, ImportTransaction } from '../types/api';
+import { ImportableAccount, ParseResponse, LedgerTransaction } from '../types/api';
 
 type WizardStep = 'upload' | 'review' | 'confirm' | 'done';
 
@@ -18,8 +18,8 @@ const ImportPage: React.FC = () => {
     // API state
     const [isLoading, setIsLoading] = useState(false);
     const [parseResult, setParseResult] = useState<ParseResponse | null>(null);
-    const [transactions, setTransactions] = useState<ImportTransaction[]>([]);
-    const [selectedTransactions, setSelectedTransactions] = useState<ImportTransaction[]>([]);
+    const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
+    const [selectedTransactions, setSelectedTransactions] = useState<LedgerTransaction[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
 
@@ -63,11 +63,11 @@ const ImportPage: React.FC = () => {
         }
     }, []);
 
-    const handleTransactionsUpdate = useCallback((updated: ImportTransaction[]) => {
+    const handleTransactionsUpdate = useCallback((updated: LedgerTransaction[]) => {
         setTransactions(updated);
     }, []);
 
-    const handleEditorConfirm = useCallback((selected: ImportTransaction[]) => {
+    const handleEditorConfirm = useCallback((selected: LedgerTransaction[]) => {
         setSelectedTransactions(selected);
         setStep('confirm');
     }, []);
@@ -75,7 +75,7 @@ const ImportPage: React.FC = () => {
     const getTargetFile = useCallback((): string => {
         if (!parseResult) return '';
         const acc = accounts.find(a => a.account === parseResult.account);
-        return acc?.import_file || '';
+        return acc?.file || '';
     }, [parseResult, accounts]);
 
     const handleConfirm = useCallback(async () => {

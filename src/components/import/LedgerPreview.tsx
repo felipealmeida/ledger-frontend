@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ImportTransaction, Posting } from '../../types/api';
+import { LedgerTransaction, Posting } from '../../types/api';
 
 interface LedgerPreviewProps {
-  transactions: ImportTransaction[];
+  transactions: LedgerTransaction[];
   fileName: string;
   onBack: () => void;
   onConfirm: () => Promise<void>;
@@ -41,7 +41,7 @@ function formatPostingLine(posting: Posting): string {
   return line;
 }
 
-function formatTransactionBlock(tx: ImportTransaction): string {
+function formatTransactionBlock(tx: LedgerTransaction): string {
   const lines = [`${tx.date} ${tx.description}`];
   for (const posting of tx.postings) {
     lines.push(formatPostingLine(posting));
@@ -49,7 +49,7 @@ function formatTransactionBlock(tx: ImportTransaction): string {
   return lines.join('\n');
 }
 
-function formatAllTransactions(transactions: ImportTransaction[]): string {
+function formatAllTransactions(transactions: LedgerTransaction[]): string {
   const blocks = transactions
     .filter(tx => !tx.skip)
     .map(formatTransactionBlock);
