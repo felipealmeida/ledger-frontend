@@ -75,7 +75,7 @@ const ImportPage: React.FC = () => {
     const getTargetFile = useCallback((): string => {
         if (!parseResult) return '';
         const acc = accounts.find(a => a.account === parseResult.account);
-        return acc?.file || '';
+        return acc?.import_file || '';
     }, [parseResult, accounts]);
 
     const handleConfirm = useCallback(async () => {

@@ -141,7 +141,7 @@ export interface Importer {
 
 export interface ImportableAccount {
   account: string;
-  file: string;
+  import_file: string;
   importers: Importer[];
 }
 
