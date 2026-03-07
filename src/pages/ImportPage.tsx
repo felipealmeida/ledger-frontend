@@ -39,15 +39,32 @@ const ImportPage: React.FC = () => {
         fetchAccounts();
     }, []);
 
-    const handleSubmitUpload = useCallback(async (file: File, account: string, parser: string, year?: number) => {
+    const handleSubmitUpload = useCallback(async (file: File | null, account: string, parser: string, year?: number) => {
         setError(null);
         setIsLoading(true);
         try {
             const yearStr = year ? String(year) : undefined;
+            const isWebParser = parser.endsWith('-web');
+
+            let parsePromise: Promise<ParseResponse>;
+            if (isWebParser) {
+                parsePromise = LedgerApiService.scrapeTransactions(account, parser, yearStr);
+            } else {
+                if (!file) throw new Error('Arquivo não selecionado');
+                parsePromise = LedgerApiService.parseStatement(file, account, parser, yearStr);
+            }
+
             const [result, catRes] = await Promise.all([
-                LedgerApiService.parseStatement(file, account, parser, yearStr),
+                parsePromise,
                 LedgerApiService.getImportCategories(),
             ]);
+
+            // Check for authentication error from scraper
+            if ('error' in result && (result as any).error === 'not_authenticated') {
+                setError((result as any).message || 'Sessão do MercadoPago expirada. Faça login no site e tente novamente.');
+                return;
+            }
+
             setParseResult(result);
             const txsWithSelected = result.transactions.map(tx => ({
                 ...tx,
@@ -57,7 +74,12 @@ const ImportPage: React.FC = () => {
             setCategories(catRes.categories);
             setStep('review');
         } catch (err: any) {
-            setError(err?.response?.data?.detail || err?.message || 'Erro ao processar fatura');
+            const detail = err?.response?.data?.detail || err?.response?.data?.message;
+            if (err?.response?.status === 401 || err?.response?.data?.error === 'not_authenticated') {
+                setError('Sessão do MercadoPago expirada. Faça login no site e tente novamente.');
+            } else {
+                setError(detail || err?.message || 'Erro ao processar fatura');
+            }
         } finally {
             setIsLoading(false);
         }

@@ -1,10 +1,10 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Globe } from 'lucide-react';
 import { ImportableAccount } from '../../types/api';
 
 interface FileUploadProps {
   accounts: ImportableAccount[];
-  onSubmit: (file: File, account: string, parser: string, year?: number) => void;
+  onSubmit: (file: File | null, account: string, parser: string, year?: number) => void;
   isLoading: boolean;
 }
 
@@ -23,6 +23,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ accounts, onSubmit, isLo
   );
 
   const importers = useMemo(() => selectedAccountData?.importers ?? [], [selectedAccountData]);
+
+  const isWebParser = selectedParser.endsWith('-web');
 
   const handleAccountChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -70,11 +72,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ accounts, onSubmit, isLo
     [handleFile]
   );
 
-  const canSubmit = selectedAccount && selectedParser && file && !isLoading;
+  const canSubmit = selectedAccount && selectedParser && (isWebParser || file) && !isLoading;
 
   const handleSubmit = () => {
-    if (!canSubmit || !file) return;
-    onSubmit(file, selectedAccount, selectedParser, year);
+    if (!canSubmit) return;
+    onSubmit(isWebParser ? null : file, selectedAccount, selectedParser, year);
   };
 
   return (
@@ -135,42 +137,54 @@ export const FileUpload: React.FC<FileUploadProps> = ({ accounts, onSubmit, isLo
         />
       </div>
 
-      {/* Drag & drop zone */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => fileInputRef.current?.click()}
-          className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 cursor-pointer transition-colors ${
-            isDragging
-              ? 'border-blue-500 bg-blue-50'
-              : file
-                ? 'border-green-300 bg-green-50'
-                : 'border-gray-300 hover:border-gray-400 bg-gray-50'
-          }`}
-        >
-          <Upload className={`h-8 w-8 mb-2 ${file ? 'text-green-500' : 'text-gray-400'}`} />
-          {file ? (
-            <p className="text-sm text-green-700 font-medium">{file.name}</p>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600">
-                Arraste o arquivo aqui ou <span className="text-blue-600 font-medium">clique para selecionar</span>
-              </p>
-              <p className="text-xs text-gray-400 mt-1">.pdf ou .csv</p>
-            </>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.csv"
-            onChange={handleInputChange}
-            className="hidden"
-          />
+      {/* Drag & drop zone — hidden for web parsers */}
+      {!isWebParser && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 cursor-pointer transition-colors ${
+              isDragging
+                ? 'border-blue-500 bg-blue-50'
+                : file
+                  ? 'border-green-300 bg-green-50'
+                  : 'border-gray-300 hover:border-gray-400 bg-gray-50'
+            }`}
+          >
+            <Upload className={`h-8 w-8 mb-2 ${file ? 'text-green-500' : 'text-gray-400'}`} />
+            {file ? (
+              <p className="text-sm text-green-700 font-medium">{file.name}</p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600">
+                  Arraste o arquivo aqui ou <span className="text-blue-600 font-medium">clique para selecionar</span>
+                </p>
+                <p className="text-xs text-gray-400 mt-1">.pdf ou .csv</p>
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.csv"
+              onChange={handleInputChange}
+              className="hidden"
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Web parser info */}
+      {isWebParser && (
+        <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+          <Globe className="h-5 w-5 text-blue-500 flex-shrink-0" />
+          <p className="text-sm text-blue-700">
+            As transações serão buscadas diretamente do site do MercadoPago.
+          </p>
+        </div>
+      )}
 
       {/* Submit button */}
       <button
@@ -181,8 +195,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ accounts, onSubmit, isLo
         {isLoading ? (
           <span className="flex items-center justify-center space-x-2">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            <span>Analisando...</span>
+            <span>{isWebParser ? 'Buscando...' : 'Analisando...'}</span>
           </span>
+        ) : isWebParser ? (
+          'Buscar Transações'
         ) : (
           'Analisar Fatura'
         )}

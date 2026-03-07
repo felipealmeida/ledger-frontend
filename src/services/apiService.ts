@@ -85,6 +85,22 @@ export class LedgerApiService {
         return response.data;
     }
 
+    static async scrapeTransactions(
+        account: string,
+        parser: string,
+        year?: string,
+    ): Promise<ParseResponse> {
+        const formData = new FormData();
+        formData.append('account', account);
+        formData.append('parser', parser);
+        if (year) formData.append('year', year);
+        const response = await api.post<ParseResponse>('/api/import/scrape', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 120000,
+        });
+        return response.data;
+    }
+
     static async getImportCategories(): Promise<ImportCategoriesResponse> {
         const response = await api.get<ImportCategoriesResponse>('/api/import/categories');
         return response.data;
